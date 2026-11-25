@@ -1,5 +1,4 @@
-import { createClient as createNodeClient, type Client, type InValue, type Transaction } from "@libsql/client";
-import { createClient as createHttpClient } from "@libsql/client/http";
+import { createClient as createHttpClient, type Client, type InValue, type Transaction } from "@libsql/client/http";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { MISSIONS } from "@/data/seed/missions";
@@ -119,20 +118,29 @@ function remoteUrl(url: string): string {
   return url;
 }
 
-export function getClient(): Client {
+type SqlStatement = { sql: string; args: InValue[] };
+
+async function openClient(): Promise<Client> {
   if (!globalForDb.gardezClient) {
     const url = databaseUrl();
-    globalForDb.gardezClient = url.startsWith("file:")
-      ? createNodeClient({ url, authToken: process.env.TURSO_AUTH_TOKEN, timeout: 8000 })
-      : createHttpClient({ url: remoteUrl(url), authToken: process.env.TURSO_AUTH_TOKEN });
+    if (url.startsWith("file:")) {
+      const { createClient } = await import("@libsql/client");
+      globalForDb.gardezClient = createClient({ url, timeout: 8000 });
+    } else {
+      globalForDb.gardezClient = createHttpClient({
+        url: remoteUrl(url),
+        authToken: process.env.TURSO_AUTH_TOKEN,
+      });
+    }
   }
   return globalForDb.gardezClient;
 }
 
-async function seed(tx: Transaction) {
+function seedStatements(): SqlStatement[] {
   const now = "2026-11-25T00:00:00.000Z";
+  const statements: SqlStatement[] = [];
   for (const person of STAFF) {
-    await tx.execute({
+    statements.push({
       sql: `INSERT OR IGNORE INTO staff (id, full_name, role, is_admin, active, created_at)
             VALUES (?, ?, ?, ?, 1, ?)`,
       args: [person.id, person.fullName, person.role, person.isAdmin ? 1 : 0, now],
@@ -140,7 +148,7 @@ async function seed(tx: Transaction) {
   }
   for (const project of PROJECTS) {
     const dates = parseWindow(project.window);
-    await tx.execute({
+    statements.push({
       sql: `INSERT OR IGNORE INTO projects
         (id, name, short_name, programme, partner, provinces, status, window_text, start_date, end_date, budget, progress, ref, active, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
@@ -163,7 +171,7 @@ async function seed(tx: Transaction) {
     });
   }
   for (const mission of MISSIONS) {
-    await tx.execute({
+    statements.push({
       sql: `INSERT OR IGNORE INTO missions
         (id, title, start_date, end_date, status, location, provinces, purpose, btor_done, created_by, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
@@ -182,20 +190,20 @@ async function seed(tx: Transaction) {
       ],
     });
     for (const projectId of mission.projectIds) {
-      await tx.execute({
+      statements.push({
         sql: "INSERT OR IGNORE INTO mission_projects (mission_id, project_id) VALUES (?, ?)",
         args: [mission.id, projectId],
       });
     }
     for (const staffId of mission.staffIds) {
-      await tx.execute({
+      statements.push({
         sql: "INSERT OR IGNORE INTO mission_staff (mission_id, staff_id) VALUES (?, ?)",
         args: [mission.id, staffId],
       });
     }
   }
   for (const item of WORKPLANS) {
-    await tx.execute({
+    statements.push({
       sql: `INSERT OR IGNORE INTO workplan_items
         (id, partner, project, activity, start_month, end_month, status, progress, source)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -213,7 +221,7 @@ async function seed(tx: Transaction) {
     });
   }
   for (const plan of PLANS) {
-    await tx.execute({
+    statements.push({
       sql: `INSERT OR IGNORE INTO plan_days
         (id, staff_id, day, week_start, province, location, activity, note, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -230,39 +238,39 @@ async function seed(tx: Transaction) {
       ],
     });
     for (const projectId of plan.projectIds) {
-      await tx.execute({
+      statements.push({
         sql: "INSERT OR IGNORE INTO plan_day_projects (plan_day_id, project_id) VALUES (?, ?)",
         args: [plan.id, projectId],
       });
     }
   }
-  await tx.execute({
+  statements.push({
     sql: "INSERT OR IGNORE INTO settings (key, value) VALUES ('work_days', ?)",
     args: [JSON.stringify(DEFAULT_WORK_DAYS)],
   });
-  await tx.execute({
+  statements.push({
     sql: "INSERT INTO settings (key, value) VALUES ('seed_version', '1')",
     args: [],
   });
+  return statements;
+}
+
+async function runBatch(client: Client, statements: SqlStatement[]) {
+  const size = 40;
+  for (let index = 0; index < statements.length; index += size) {
+    await client.batch(statements.slice(index, index + size), "write");
+  }
 }
 
 async function init() {
-  const client = getClient();
-  for (const statement of SCHEMA) {
-    await client.execute(statement);
-  }
-  const tx = await client.transaction("write");
-  try {
-    const existing = await tx.execute("SELECT value FROM settings WHERE key = 'seed_version'");
-    if (String(existing.rows[0]?.value ?? "") !== "1") {
-      await seed(tx);
-    }
-    await tx.commit();
-  } catch (error) {
-    if (!tx.closed) await tx.rollback();
-    throw error;
-  } finally {
-    tx.close();
+  const client = await openClient();
+  await runBatch(
+    client,
+    SCHEMA.map((sql) => ({ sql, args: [] })),
+  );
+  const existing = await client.execute("SELECT value FROM settings WHERE key = 'seed_version'");
+  if (String(existing.rows[0]?.value ?? "") !== "1") {
+    await runBatch(client, seedStatements());
   }
 }
 
@@ -278,7 +286,7 @@ export function ready(): Promise<void> {
 
 export async function transaction<T>(fn: (tx: Transaction) => Promise<T>): Promise<T> {
   await ready();
-  const tx = await getClient().transaction("write");
+  const tx = await (await openClient()).transaction("write");
   try {
     const result = await fn(tx);
     await tx.commit();
@@ -293,7 +301,7 @@ export async function transaction<T>(fn: (tx: Transaction) => Promise<T>): Promi
 
 export async function all<T>(sql: string, args: InValue[] = []): Promise<T[]> {
   await ready();
-  const result = await getClient().execute({ sql, args });
+  const result = await (await openClient()).execute({ sql, args });
   return result.rows as unknown as T[];
 }
 
@@ -304,5 +312,5 @@ export async function get<T>(sql: string, args: InValue[] = []): Promise<T | und
 
 export async function run(sql: string, args: InValue[] = []): Promise<void> {
   await ready();
-  await getClient().execute({ sql, args });
+  await (await openClient()).execute({ sql, args });
 }

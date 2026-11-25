@@ -15,6 +15,7 @@ export function Shell({
     { href: "/", label: "Dashboard" },
     { href: "/plan", label: "My week" },
     { href: "/projects", label: "Projects" },
+    { href: "/map", label: "Map" },
     { href: "/missions", label: "Missions" },
     { href: "/workplans", label: "Workplans" },
   ];

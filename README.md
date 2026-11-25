@@ -60,6 +60,7 @@ SQLite on the Vercel filesystem does not keep writes. Production uses [Turso](ht
 - **Dashboard.** Staff × day grid for the selected week, filters (week, staff, project, programme, province), staff-day counts, who is in the field today (site visit, monitoring, or travel), earlier weeks, CSV and Excel export.
 - **My week.** For each working day, tick one or more projects, and optionally set province, district, activity (site visit, monitoring, meeting, office work, travel), and a note. Current and upcoming weeks can be edited. Past weeks are read-only, except for an admin editing their own week.
 - **Projects.** The 24 seeded projects, with programme, partner, provinces, status, dates, budget, and progress.
+- **Map.** The same projects as pins on the South-East provinces. Open a pin for the full project record and the latest mission or weekly-plan note. The map is drawn in the page, with no map-tile download.
 - **Missions.** Log of trips. Anyone signed in can add or edit dates, location, projects, travellers, purpose, status, and whether the BTOR is done.
 - **Workplans.** Partner activities as a month-by-month bar chart.
 - **Admin** (Samoon, or anyone else marked admin). Add or edit staff and projects, and change which days count as the work week. Default is Saturday–Thursday. There is nothing to reset: sign-in is the last name.
@@ -69,7 +70,8 @@ If two active staff share a last name, sign-in shows a list of full names.
 ## Decisions
 
 - Last-name sign-in and a 60-day cookie, as requested. This is convenience for a small office on a phone, not an access-control boundary. Anyone who knows a last name on the list can open the planner.
-- English UI, UNDP blue (`#0468b1` / `#003865`), system fonts, server-rendered pages, and no chart library, so the pages stay small on a slow connection.
+- English UI, UNDP blue (`#0468b1` / `#003865`), system fonts, server-rendered pages, and no chart or map-tile library, so the pages stay small on a slow connection.
+- Map pins sit on the province. The office list records provinces, not GPS points for each site.
 - One SQLite schema for laptop and Turso. Dates use the Asia/Kabul calendar.
 - “In the field today” means the activity is a site visit, monitoring, or travel.
 - A project staff-day is one person including that project on one day. A province staff-day is one person on one day, using the province they set (or, if they left it blank, a province on the chosen project).

@@ -1,6 +1,7 @@
 import { all, get, run, transaction } from "@/lib/db";
 import { DEFAULT_WORK_DAYS, normalizeWorkDays } from "@/lib/dates";
-import type { DayDraft, Mission, PlanDay, PlanProject, Project, Staff, WorkplanItem } from "@/lib/types";
+import { activityLabel } from "@/lib/labels";
+import type { DayDraft, FieldUpdate, Mission, PlanDay, PlanProject, Project, Staff, WorkplanItem } from "@/lib/types";
 
 type SqlRow = Record<string, unknown>;
 
@@ -406,6 +407,67 @@ export async function deleteMission(id: string): Promise<void> {
     await tx.execute({ sql: "DELETE FROM mission_staff WHERE mission_id = ?", args: [id] });
     await tx.execute({ sql: "DELETE FROM missions WHERE id = ?", args: [id] });
   });
+}
+
+export async function listFieldUpdates(): Promise<Record<string, FieldUpdate[]>> {
+  const missions = await all<SqlRow>(
+    `SELECT mp.project_id, m.id, m.title, m.start_date, m.end_date, m.status, m.location, m.purpose, m.btor_done,
+        (SELECT group_concat(s.full_name, ', ')
+         FROM mission_staff ms JOIN staff s ON s.id = ms.staff_id
+         WHERE ms.mission_id = m.id) AS who
+     FROM mission_projects mp
+     JOIN missions m ON m.id = mp.mission_id
+     ORDER BY m.start_date DESC`,
+  );
+  const plans = await all<SqlRow>(
+    `SELECT pdp.project_id, pd.day, pd.province, pd.location, pd.activity, pd.note, pd.staff_id, s.full_name
+     FROM plan_day_projects pdp
+     JOIN plan_days pd ON pd.id = pdp.plan_day_id
+     JOIN staff s ON s.id = pd.staff_id
+     ORDER BY pd.day DESC`,
+  );
+  const grouped = new Map<string, FieldUpdate[]>();
+  const push = (projectId: string, update: FieldUpdate) => {
+    if (!projectId) return;
+    const list = grouped.get(projectId) ?? [];
+    list.push(update);
+    grouped.set(projectId, list);
+  };
+  for (const row of missions) {
+    push(text(row.project_id), {
+      kind: "mission",
+      date: text(row.start_date),
+      endDate: text(row.end_date),
+      title: text(row.title),
+      place: text(row.location),
+      status: text(row.status),
+      detail: text(row.purpose),
+      who: text(row.who),
+      href: `/missions/${text(row.id)}`,
+      btorDone: flag(row.btor_done),
+    });
+  }
+  for (const row of plans) {
+    const place = [text(row.location), text(row.province)].filter(Boolean).join(", ");
+    push(text(row.project_id), {
+      kind: "plan",
+      date: text(row.day),
+      endDate: text(row.day),
+      title: activityLabel(text(row.activity)) || "Weekly plan",
+      place,
+      status: "Weekly plan",
+      detail: text(row.note),
+      who: text(row.full_name),
+      href: `/plan?week=${encodeURIComponent(text(row.day))}&staff=${encodeURIComponent(text(row.staff_id))}`,
+      btorDone: false,
+    });
+  }
+  const result: Record<string, FieldUpdate[]> = {};
+  for (const [id, list] of grouped) {
+    list.sort((a, b) => b.date.localeCompare(a.date) || (a.kind === "mission" ? -1 : 1));
+    result[id] = list.slice(0, 3);
+  }
+  return result;
 }
 
 export async function listWorkplans(partner = "", status = ""): Promise<WorkplanItem[]> {

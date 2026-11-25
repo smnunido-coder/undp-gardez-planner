@@ -59,6 +59,19 @@ export type Mission = {
   staffIds: string[];
 };
 
+export type FieldUpdate = {
+  kind: "mission" | "plan";
+  date: string;
+  endDate: string;
+  title: string;
+  place: string;
+  status: string;
+  detail: string;
+  who: string;
+  href: string;
+  btorDone: boolean;
+};
+
 export type WorkplanItem = {
   id: string;
   partner: string;

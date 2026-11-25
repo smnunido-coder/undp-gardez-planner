@@ -9,9 +9,10 @@ delete process.env.TURSO_DATABASE_URL;
 async function main() {
 const { loginKey, matchStaff } = await import("../lib/names");
 const { weekStartFor, weekDates, DEFAULT_WORK_DAYS } = await import("../lib/dates");
-const { listStaff, listProjects, listMissions, listWorkplans, replaceStaffWeek, plansBetween } = await import(
+const { listStaff, listProjects, listMissions, listWorkplans, listFieldUpdates, replaceStaffWeek, plansBetween } = await import(
   "../lib/queries"
 );
+const { PROVINCE_SHAPES } = await import("../lib/geo/southeast");
 
 function assert(condition: unknown, message: string) {
   if (!condition) throw new Error(message);
@@ -60,6 +61,16 @@ const extra = [
 ];
 assert(matchStaff(extra, "khan").length === 2, "shared last name");
 assert(matchStaff(extra, "Laila Khan").length === 1, "full name wins");
+
+const shapes = new Set(PROVINCE_SHAPES.map((shape) => shape.name));
+assert(shapes.size === 8, "eight provinces on the map");
+for (const project of projects) {
+  for (const name of project.provinces) assert(shapes.has(name), `map shape ${name}`);
+}
+const updates = await listFieldUpdates();
+const alccUpdates = updates["JICA-ALCC"] ?? [];
+assert(alccUpdates.some((update) => update.kind === "plan" && update.place.includes("Yousuf Khail")), "map plan update");
+assert(alccUpdates.some((update) => update.kind === "mission"), "map mission update");
 
 console.log("verify ok", { staff: staff.length, projects: projects.length, missions: missions.length, workplans: workplans.length });
 }

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Suspense } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,7 +52,12 @@ async function Projects({
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold text-navy">Projects</h1>
-        <p className="text-sm text-muted-foreground">{filtered.length} of {projects.length} in the South-East portfolio.</p>
+        <p className="text-sm text-muted-foreground">
+          {filtered.length} of {projects.length} in the South-East portfolio.{" "}
+          <Link href="/map" className="font-medium text-primary underline-offset-2 hover:underline">
+            Open the map
+          </Link>
+        </p>
       </div>
       <Card className="p-3">
         <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">

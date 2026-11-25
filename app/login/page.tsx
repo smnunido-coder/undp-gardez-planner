@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { login } from "@/lib/actions";
 import { getOptionalUser } from "@/lib/auth";
 import { ERRORS } from "@/lib/messages";
 import { matchStaff } from "@/lib/names";
@@ -60,7 +59,7 @@ async function LoginForm({
           <div className="space-y-2">
             <p className="text-sm font-medium">More than one colleague uses that last name. Choose yours.</p>
             {matches.map((person) => (
-              <form key={person.id} action={login}>
+              <form key={person.id} action="/api/login" method="post">
                 <input type="hidden" name="lastName" value={choose} />
                 <input type="hidden" name="staffId" value={person.id} />
                 <button
@@ -74,7 +73,7 @@ async function LoginForm({
             ))}
           </div>
         ) : (
-          <form action={login} className="space-y-4">
+          <form action="/api/login" method="post" className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="lastName">Last name</Label>
               <Input

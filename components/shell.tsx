@@ -1,4 +1,3 @@
-import { logout } from "@/lib/actions";
 import { workDaySentence } from "@/lib/dates";
 import type { Staff } from "@/lib/types";
 import { Nav } from "@/components/nav";
@@ -32,7 +31,7 @@ export function Shell({
           <div className="max-w-[12rem] text-right text-sm sm:max-w-xs">
             <p className="font-medium leading-5">{user.fullName}</p>
             {user.role ? <p className="text-xs text-sky-100/80">{user.role}</p> : null}
-            <form action={logout}>
+            <form action="/api/logout" method="post">
               <button type="submit" className="mt-1 text-sm text-sky-200 underline-offset-2 hover:underline">
                 Sign out
               </button>

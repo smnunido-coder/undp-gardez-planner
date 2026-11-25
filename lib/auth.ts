@@ -53,10 +53,19 @@ function readToken(token: string, now: number): SessionPayload | null {
   }
 }
 
+export function sessionCookie(staffId: string) {
+  return {
+    name: COOKIE,
+    value: sign(staffId, Date.now()),
+    options: { ...cookieBase(), maxAge: MAX_AGE_SECONDS },
+  };
+}
+
 export async function setSession(staffId: string): Promise<void> {
   await connection();
+  const cookie = sessionCookie(staffId);
   const jar = await cookies();
-  jar.set(COOKIE, sign(staffId, Date.now()), { ...cookieBase(), maxAge: MAX_AGE_SECONDS });
+  jar.set(cookie.name, cookie.value, cookie.options);
 }
 
 export async function clearSession(): Promise<void> {

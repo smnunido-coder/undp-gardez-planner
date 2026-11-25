@@ -57,7 +57,11 @@ export async function login(formData: FormData) {
   }
   if (matches.length === 0) redirect(`/login?error=none&name=${encodeURIComponent(cleaned)}`);
   if (matches.length > 1) redirect(`/login?choose=${encodeURIComponent(cleaned)}`);
-  await setSession(matches[0]!.id);
+  try {
+    await setSession(matches[0]!.id);
+  } catch {
+    redirect("/login?error=database");
+  }
   redirect("/");
 }
 

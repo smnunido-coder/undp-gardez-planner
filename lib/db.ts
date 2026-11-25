@@ -1,4 +1,5 @@
-import { createClient, type Client, type InValue, type Transaction } from "@libsql/client";
+import { createClient as createNodeClient, type Client, type InValue, type Transaction } from "@libsql/client";
+import { createClient as createHttpClient } from "@libsql/client/http";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { MISSIONS } from "@/data/seed/missions";
@@ -113,14 +114,17 @@ function databaseUrl(): string {
   return `file:${file}`;
 }
 
+function remoteUrl(url: string): string {
+  if (url.startsWith("libsql://")) return `https://${url.slice("libsql://".length)}`;
+  return url;
+}
+
 export function getClient(): Client {
   if (!globalForDb.gardezClient) {
     const url = databaseUrl();
-    globalForDb.gardezClient = createClient({
-      url,
-      authToken: process.env.TURSO_AUTH_TOKEN,
-      timeout: 8000,
-    });
+    globalForDb.gardezClient = url.startsWith("file:")
+      ? createNodeClient({ url, authToken: process.env.TURSO_AUTH_TOKEN, timeout: 8000 })
+      : createHttpClient({ url: remoteUrl(url), authToken: process.env.TURSO_AUTH_TOKEN });
   }
   return globalForDb.gardezClient;
 }

@@ -46,7 +46,7 @@ async function LoginForm({
       <p className="text-sm font-medium text-primary">UNDP South-East · Gardez</p>
       <h1 className="mt-1 text-3xl font-semibold tracking-tight text-navy">Field planner</h1>
       <p className="mt-3 text-sm leading-6 text-muted-foreground">
-        Sign in with the last word of your name. No password. Sayed Samoon Ahmadi signs in as Ahmadi. Dad
+        Sign in with the last word of your name and your password. Sayed Samoon Ahmadi signs in as Ahmadi. Dad
         Mohammad Samoon signs in as Samoon.
       </p>
       <Card className="mt-6 p-4">
@@ -58,19 +58,33 @@ async function LoginForm({
         {matches.length > 1 ? (
           <div className="space-y-2">
             <p className="text-sm font-medium">More than one colleague uses that last name. Choose yours.</p>
-            {matches.map((person) => (
-              <form key={person.id} action="/api/login" method="post">
-                <input type="hidden" name="lastName" value={choose} />
-                <input type="hidden" name="staffId" value={person.id} />
-                <button
-                  type="submit"
-                  className="w-full rounded-md border border-border px-3 py-3 text-left hover:bg-accent"
-                >
-                  <span className="block font-medium">{person.fullName}</span>
-                  {person.role ? <span className="block text-sm text-muted-foreground">{person.role}</span> : null}
-                </button>
-              </form>
-            ))}
+            <form action="/api/login" method="post" className="space-y-3">
+              <input type="hidden" name="lastName" value={choose} />
+              {matches.map((person) => (
+                <label key={person.id} className="flex items-start gap-2 rounded-md border border-border px-3 py-3">
+                  <input type="radio" name="staffId" value={person.id} required className="mt-1 size-4 accent-primary" />
+                  <span>
+                    <span className="block font-medium">{person.fullName}</span>
+                    {person.role ? <span className="block text-sm text-muted-foreground">{person.role}</span> : null}
+                  </span>
+                </label>
+              ))}
+              <div className="space-y-1.5">
+                <Label htmlFor="choose-password">Password</Label>
+                <Input
+                  id="choose-password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                />
+              </div>
+              <Button type="submit" size="lg" className="w-full">
+                Continue
+              </Button>
+            </form>
           </div>
         ) : (
           <form action="/api/login" method="post" className="space-y-4">
@@ -85,9 +99,21 @@ async function LoginForm({
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
-                autoComplete="name"
-                enterKeyHint="go"
+                autoComplete="username"
                 placeholder="Durani"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="go"
               />
             </div>
             <Button type="submit" size="lg" className="w-full">
@@ -97,7 +123,7 @@ async function LoginForm({
         )}
       </Card>
       <p className="mt-4 text-xs leading-5 text-muted-foreground">
-        Dad Mohammad Samoon keeps the staff list. The phone remembers you for 60 days.
+        The starting password is the last name in lowercase, such as samoon or ahmadi. Samoon can change any of them. The phone remembers you for 60 days.
       </p>
     </main>
   );

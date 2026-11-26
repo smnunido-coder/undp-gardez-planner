@@ -32,8 +32,11 @@ export function Shell({
           <div className="max-w-[12rem] text-right text-sm sm:max-w-xs">
             <p className="font-medium leading-5">{user.fullName}</p>
             {user.role ? <p className="text-xs text-sky-100/80">{user.role}</p> : null}
+            <a href="/password" className="mt-1 block text-sm text-sky-200 underline-offset-2 hover:underline">
+              Password
+            </a>
             <form action="/api/logout" method="post">
-              <button type="submit" className="mt-1 text-sm text-sky-200 underline-offset-2 hover:underline">
+              <button type="submit" className="text-sm text-sky-200 underline-offset-2 hover:underline">
                 Sign out
               </button>
             </form>

@@ -44,7 +44,9 @@ async function Admin({
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold text-navy">Admin</h1>
-        <p className="text-sm text-muted-foreground">Staff, projects, and the office work week. Sign-in is the last name only.</p>
+        <p className="text-sm text-muted-foreground">
+          Staff, projects, and the office work week. A password can be anything. Leave the box blank to keep the current one.
+        </p>
       </div>
       <Banner notice={one(params.notice)} error={one(params.error)} />
 
@@ -81,6 +83,17 @@ async function Admin({
             <label className="text-sm sm:col-span-2">
               <span className="mb-1 block font-medium">Role</span>
               <input className={fieldClass} name="role" defaultValue={editingStaff?.role ?? ""} />
+            </label>
+            <label className="text-sm sm:col-span-2">
+              <span className="mb-1 block font-medium">Password</span>
+              <input
+                className={fieldClass}
+                name="password"
+                type="text"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={editingStaff ? "Leave blank to keep the current password" : "Leave blank to start with the last name"}
+              />
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" name="isAdmin" value="1" defaultChecked={editingStaff?.isAdmin ?? false} className="size-5 accent-primary" />

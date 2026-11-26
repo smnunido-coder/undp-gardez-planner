@@ -9,9 +9,10 @@ delete process.env.TURSO_DATABASE_URL;
 async function main() {
 const { loginKey, matchStaff } = await import("../lib/names");
 const { weekStartFor, weekDates, DEFAULT_WORK_DAYS } = await import("../lib/dates");
-const { listStaff, listProjects, listMissions, listWorkplans, listFieldUpdates, replaceStaffWeek, plansBetween } = await import(
+const { listStaff, listProjects, listMissions, listWorkplans, listFieldUpdates, getPasswordHash, setPassword, replaceStaffWeek, plansBetween } = await import(
   "../lib/queries"
 );
+const { verifyPassword } = await import("../lib/passwords");
 const { PROVINCE_SHAPES } = await import("../lib/geo/southeast");
 
 function assert(condition: unknown, message: string) {
@@ -37,6 +38,14 @@ assert(staff.filter((person) => person.isAdmin).map((person) => person.fullName)
 assert(matchStaff(staff, "Durani").length === 1, "Durani");
 assert(matchStaff(staff, "samoon")[0]?.id === "STF-11", "Samoon login");
 assert(matchStaff(staff, "Ahmadi")[0]?.id === "STF-06", "Ahmadi login");
+assert(await verifyPassword("durani", await getPasswordHash("STF-02")), "starting password is the last name");
+assert(await verifyPassword("ahmadi", await getPasswordHash("STF-06")), "Ahmadi password");
+assert(!(await verifyPassword("samoon", await getPasswordHash("STF-06"))), "Ahmadi is not Samoon");
+await setPassword("STF-02", "x");
+assert(await verifyPassword("x", await getPasswordHash("STF-02")), "one character password");
+await setPassword("STF-02", "a b  ");
+assert(await verifyPassword("a b  ", await getPasswordHash("STF-02")), "password kept exactly");
+assert(!(await verifyPassword("a b", await getPasswordHash("STF-02"))), "spaces are part of the password");
 
 await replaceStaffWeek("STF-02", "2026-11-21", [
   {

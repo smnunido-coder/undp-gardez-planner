@@ -2,15 +2,18 @@
 
 import { redirect } from "next/navigation";
 import { requireAdmin, setSession, clearSession, getCurrentUser } from "@/lib/auth";
+import { verifyPassword } from "@/lib/passwords";
+import { checkSignIn } from "@/lib/sign-in";
 import { connection } from "next/server";
 import { AFGHAN_WEEK, canEditWeek, kabulToday, normalizeWorkDays, weekDates, weekStartFor } from "@/lib/dates";
 import { ACTIVITIES, MISSION_STATUSES, PROVINCES } from "@/lib/labels";
-import { loginKey, matchStaff, normalizeNameInput } from "@/lib/names";
+import { loginKey } from "@/lib/names";
 import {
   countActiveAdmins,
   deleteMission,
   getMission,
   getProject,
+  getPasswordHash,
   getStaff,
   getWorkDays,
   listProjects,
@@ -19,6 +22,7 @@ import {
   saveMission,
   saveProject,
   saveStaff,
+  setPassword,
   setWorkDays,
 } from "@/lib/queries";
 import type { DayDraft } from "@/lib/types";
@@ -33,36 +37,28 @@ function fail(path: string, key: string): never {
 }
 
 export async function login(formData: FormData) {
-  const raw = String(formData.get("lastName") ?? "");
-  const staffId = String(formData.get("staffId") ?? "");
-  const cleaned = normalizeNameInput(raw);
-  if (!cleaned) redirect("/login?error=empty");
-
-  let staff;
+  const result = await checkSignIn({
+    lastName: String(formData.get("lastName") ?? ""),
+    staffId: String(formData.get("staffId") ?? ""),
+    password: String(formData.get("password") ?? ""),
+  });
+  if (!result.ok) redirect(`/login?${result.query}`);
   try {
-    staff = await listStaff();
-  } catch {
-    redirect("/login?error=database");
-  }
-  const any = matchStaff(staff, cleaned, { includeInactive: true });
-  const matches = any.filter((person) => person.active);
-  if (any.length > 0 && matches.length === 0) {
-    redirect(`/login?error=inactive&name=${encodeURIComponent(cleaned)}`);
-  }
-  if (staffId) {
-    const chosen = matches.find((person) => person.id === staffId);
-    if (!chosen) redirect(`/login?error=none&name=${encodeURIComponent(cleaned)}`);
-    await setSession(chosen.id);
-    redirect("/");
-  }
-  if (matches.length === 0) redirect(`/login?error=none&name=${encodeURIComponent(cleaned)}`);
-  if (matches.length > 1) redirect(`/login?choose=${encodeURIComponent(cleaned)}`);
-  try {
-    await setSession(matches[0]!.id);
+    await setSession(result.staffId);
   } catch {
     redirect("/login?error=database");
   }
   redirect("/");
+}
+
+export async function changePassword(formData: FormData) {
+  const user = await getCurrentUser();
+  const current = String(formData.get("current") ?? "");
+  const next = String(formData.get("next") ?? "");
+  const hash = await getPasswordHash(user.id);
+  if (!(await verifyPassword(current, hash))) fail("/password", "password");
+  await setPassword(user.id, next);
+  notice("/password", "password");
 }
 
 export async function logout() {
@@ -139,7 +135,9 @@ export async function saveStaffAction(formData: FormData) {
   }
 
   const id = isNew ? `STF-${crypto.randomUUID().slice(0, 8)}` : existingId;
-  await saveStaff({ id, fullName, role, isAdmin, active, isNew });
+  const typed = String(formData.get("password") ?? "");
+  const password = typed.length > 0 ? typed : isNew ? loginKey(fullName) : null;
+  await saveStaff({ id, fullName, role, isAdmin, active, isNew, password });
   notice("/admin", "staff");
 }
 

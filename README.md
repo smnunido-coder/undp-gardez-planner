@@ -13,7 +13,7 @@ Open [http://127.0.0.1:3847](http://127.0.0.1:3847).
 
 The first request creates `data/gardez.db` (SQLite, via libSQL) and loads the office lists: 12 staff, 24 projects, the mission log, and the partner workplan bars. That file is gitignored. `npm run db:seed` opens the same database and prints the row counts. `npm run verify` checks sign-in matching, the Afghan week, and a two-project day against a temporary database.
 
-Sign in with the last word of your name, for example `Durani`, `Yarghal`, `Ludin`, `Ahmadi`, or `Samoon`. `Samoon` is Dad Mohammad Samoon (admin). Sayed Samoon Ahmadi signs in as `Ahmadi`. There is no password. The browser keeps an httpOnly cookie for 60 days.
+Sign in with the last word of your name and a password, for example `Durani`, `Yarghal`, `Ludin`, `Ahmadi`, or `Samoon`. `Samoon` is Dad Mohammad Samoon (admin). Sayed Samoon Ahmadi signs in as `Ahmadi`. Until someone changes it, the password is that same last name in lowercase. A password can be anything, of any length. The browser keeps an httpOnly cookie for 60 days.
 
 No personal emails or phone numbers are stored.
 
@@ -63,13 +63,14 @@ SQLite on the Vercel filesystem does not keep writes. Production uses [Turso](ht
 - **Map.** The same projects as pins on the South-East provinces. Open a pin for the full project record and the latest mission or weekly-plan note. The map is drawn in the page, with no map-tile download.
 - **Missions.** Log of trips. Anyone signed in can add or edit dates, location, projects, travellers, purpose, status, and whether the BTOR is done.
 - **Workplans.** Partner activities as a month-by-month bar chart.
-- **Admin** (Samoon, or anyone else marked admin). Add or edit staff and projects, and change which days count as the work week. Default is Saturday–Thursday. There is nothing to reset: sign-in is the last name.
+- **Password.** Each person can change their own password. It can be any text, of any length. An admin can set anyone's password from the staff form. Leave that box blank to keep the current password.
+- **Admin** (Samoon, or anyone else marked admin). Add or edit staff and projects, and change which days count as the work week. Default is Saturday–Thursday.
 
 If two active staff share a last name, sign-in shows a list of full names.
 
 ## Decisions
 
-- Last-name sign-in and a 60-day cookie, as requested. This is convenience for a small office on a phone, not an access-control boundary. Anyone who knows a last name on the list can open the planner.
+- Last name plus a password, and a 60-day cookie. Passwords are stored as a salted hash. There is no length or character rule. The first password for each person is their last name in lowercase, so the office can sign in, and it can be changed to anything.
 - English UI, UNDP blue (`#0468b1` / `#003865`), system fonts, server-rendered pages, and no chart or map-tile library, so the pages stay small on a slow connection.
 - Map pins sit on the province. The office list records provinces, not GPS points for each site.
 - One SQLite schema for laptop and Turso. Dates use the Asia/Kabul calendar.

@@ -7,6 +7,8 @@ import { PROJECTS } from "@/data/seed/projects";
 import { STAFF } from "@/data/seed/staff";
 import { WORKPLANS } from "@/data/seed/workplans";
 import { DEFAULT_WORK_DAYS, parseWindow } from "@/lib/dates";
+import { loginKey } from "@/lib/names";
+import { hashPassword } from "@/lib/passwords";
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS staff (
@@ -15,6 +17,7 @@ const SCHEMA = [
     role TEXT NOT NULL DEFAULT '',
     is_admin INTEGER NOT NULL DEFAULT 0,
     active INTEGER NOT NULL DEFAULT 1,
+    password_hash TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS projects (
@@ -271,6 +274,25 @@ async function init() {
   const existing = await client.execute("SELECT value FROM settings WHERE key = 'seed_version'");
   if (String(existing.rows[0]?.value ?? "") !== "1") {
     await runBatch(client, seedStatements());
+  }
+  await ensurePasswords(client);
+}
+
+async function ensurePasswords(client: Client) {
+  try {
+    await client.execute("ALTER TABLE staff ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/duplicate column/i.test(message)) throw error;
+  }
+  const rows = await client.execute("SELECT id, full_name, password_hash FROM staff");
+  for (const row of rows.rows) {
+    if (String(row.password_hash ?? "") !== "") continue;
+    const hash = await hashPassword(loginKey(String(row.full_name)));
+    await client.execute({
+      sql: "UPDATE staff SET password_hash = ? WHERE id = ? AND password_hash = ''",
+      args: [hash, String(row.id)],
+    });
   }
 }
 

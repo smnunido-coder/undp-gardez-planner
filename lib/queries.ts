@@ -1,4 +1,5 @@
 import { all, get, run, transaction } from "@/lib/db";
+import { hashPassword } from "@/lib/passwords";
 import { DEFAULT_WORK_DAYS, normalizeWorkDays } from "@/lib/dates";
 import { activityLabel } from "@/lib/labels";
 import type { DayDraft, FieldUpdate, Mission, PlanDay, PlanProject, Project, Staff, WorkplanItem } from "@/lib/types";
@@ -127,6 +128,15 @@ export async function countActiveAdmins(exceptId?: string): Promise<number> {
   return Number(row?.n ?? 0);
 }
 
+export async function getPasswordHash(id: string): Promise<string> {
+  const row = await get<SqlRow>("SELECT password_hash FROM staff WHERE id = ?", [id]);
+  return text(row?.password_hash);
+}
+
+export async function setPassword(id: string, password: string): Promise<void> {
+  await run("UPDATE staff SET password_hash = ? WHERE id = ?", [await hashPassword(password), id]);
+}
+
 export async function saveStaff(input: {
   id: string;
   fullName: string;
@@ -134,19 +144,43 @@ export async function saveStaff(input: {
   isAdmin: boolean;
   active: boolean;
   isNew: boolean;
+  password: string | null;
 }): Promise<void> {
+  const now = new Date().toISOString();
   if (input.isNew) {
     await run(
-      `INSERT INTO staff (id, full_name, role, is_admin, active, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [input.id, input.fullName, input.role, input.isAdmin ? 1 : 0, input.active ? 1 : 0, new Date().toISOString()],
+      `INSERT INTO staff (id, full_name, role, is_admin, active, password_hash, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        input.id,
+        input.fullName,
+        input.role,
+        input.isAdmin ? 1 : 0,
+        input.active ? 1 : 0,
+        await hashPassword(input.password ?? ""),
+        now,
+      ],
     );
     return;
   }
-  await run(
-    "UPDATE staff SET full_name = ?, role = ?, is_admin = ?, active = ? WHERE id = ?",
-    [input.fullName, input.role, input.isAdmin ? 1 : 0, input.active ? 1 : 0, input.id],
-  );
+  if (input.password === null) {
+    await run("UPDATE staff SET full_name = ?, role = ?, is_admin = ?, active = ? WHERE id = ?", [
+      input.fullName,
+      input.role,
+      input.isAdmin ? 1 : 0,
+      input.active ? 1 : 0,
+      input.id,
+    ]);
+    return;
+  }
+  await run("UPDATE staff SET full_name = ?, role = ?, is_admin = ?, active = ?, password_hash = ? WHERE id = ?", [
+    input.fullName,
+    input.role,
+    input.isAdmin ? 1 : 0,
+    input.active ? 1 : 0,
+    await hashPassword(input.password),
+    input.id,
+  ]);
 }
 
 export async function listProjects(): Promise<Project[]> {

@@ -61,7 +61,7 @@ SQLite on the Vercel filesystem does not keep writes. Production uses [Turso](ht
 - **My week.** For each working day, tick one or more projects, and optionally set province, district, activity (site visit, monitoring, meeting, office work, travel), and a note. Each day saves on its own. Current and upcoming weeks can be edited. An admin can file any colleague's week, including past weeks.
 - **Projects.** The 24 seeded projects, with programme, partner, provinces, status, dates, budget, and progress.
 - **Map.** The same projects as pins on the South-East provinces. Open a pin for the full project record and the latest mission or weekly-plan note. The map is drawn in the page, with no map-tile download.
-- **Missions.** Log of trips. Anyone signed in can add or edit dates, location, projects, travellers, purpose, status, and whether the BTOR is done. Open a mission and write the back-to-office report. Download makes a Word file with the same sections as the Gardez field-visit report.
+- **Missions.** Log of trips. Anyone signed in can add or edit dates, location, projects, travellers, purpose, status, and whether the BTOR is done. Open a mission, enter the report, and add photos. Download Word fills the UNDP field-visit template.
 - **Workplans.** Partner activities as a month-by-month bar chart.
 - **Password.** Each person can change their own password. It can be any text, of any length. An admin can set anyone's password from the staff form. Leave that box blank to keep the current password.
 - **Admin** (Samoon, or anyone else marked admin). Add or edit staff and projects, and change which days count as the work week. Default is Saturday–Thursday.

@@ -22,7 +22,7 @@ export const ERRORS: Record<string, string> = {
   empty: "Type your last name.",
   password: "That password does not match.",
   "password-needed": "Type a password for this person. Any text is fine.",
-  btor: "Add the partner, staff, dates, location, and purpose before saving the report.",
+  photo: "Each photo needs to be a picture the phone can send. Try again with fewer photos.",
   none: "No one on the staff list has that last name.",
   inactive: "That name is inactive. Ask Samoon to turn it back on.",
   database: "The site cannot reach the database yet. The Turso address and token need to be saved, then the site deployed again.",

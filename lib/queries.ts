@@ -2,7 +2,7 @@ import { all, get, run, transaction } from "@/lib/db";
 import { hashPassword } from "@/lib/passwords";
 import { DEFAULT_WORK_DAYS, normalizeWorkDays } from "@/lib/dates";
 import { activityLabel } from "@/lib/labels";
-import type { BtorReport, DayDraft, FieldUpdate, Mission, PlanDay, PlanProject, Project, Staff, WorkplanItem } from "@/lib/types";
+import type { BtorPhoto, BtorReport, DayDraft, FieldUpdate, Mission, PlanDay, PlanProject, Project, Staff, WorkplanItem } from "@/lib/types";
 
 type SqlRow = Record<string, unknown>;
 
@@ -444,6 +444,7 @@ export async function saveMission(input: Mission & { isNew: boolean }): Promise<
 
 export async function deleteMission(id: string): Promise<void> {
   await transaction(async (tx) => {
+    await tx.execute({ sql: "DELETE FROM mission_photos WHERE mission_id = ?", args: [id] });
     await tx.execute({ sql: "DELETE FROM mission_reports WHERE mission_id = ?", args: [id] });
     await tx.execute({ sql: "DELETE FROM mission_projects WHERE mission_id = ?", args: [id] });
     await tx.execute({ sql: "DELETE FROM mission_staff WHERE mission_id = ?", args: [id] });
@@ -511,10 +512,78 @@ export async function saveBtor(report: BtorReport, staffId: string): Promise<voi
         staffId,
       ],
     });
-    await tx.execute({
-      sql: "UPDATE missions SET btor_done = 1, updated_at = ? WHERE id = ?",
-      args: [now, report.missionId],
-    });
+    if (report.objectives && report.findings) {
+      await tx.execute({
+        sql: "UPDATE missions SET btor_done = 1, updated_at = ? WHERE id = ?",
+        args: [now, report.missionId],
+      });
+    }
+  });
+}
+
+function photoBytes(value: unknown): Uint8Array {
+  if (value instanceof Uint8Array) return value;
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  if (typeof value === "string") return Uint8Array.from(Buffer.from(value, "base64"));
+  return new Uint8Array();
+}
+
+export async function listBtorPhotoMeta(missionId: string): Promise<{ id: string; name: string }[]> {
+  const rows = await all<SqlRow>(
+    "SELECT id, name FROM mission_photos WHERE mission_id = ? ORDER BY created_at, id",
+    [missionId],
+  );
+  return rows.map((row) => ({ id: text(row.id), name: text(row.name) }));
+}
+
+export async function listBtorPhotos(missionId: string): Promise<BtorPhoto[]> {
+  const rows = await all<SqlRow>(
+    "SELECT id, mission_id, name, mime, bytes FROM mission_photos WHERE mission_id = ? ORDER BY created_at, id",
+    [missionId],
+  );
+  return rows.map((row) => ({
+    id: text(row.id),
+    missionId: text(row.mission_id),
+    name: text(row.name),
+    mime: text(row.mime) || "image/jpeg",
+    bytes: photoBytes(row.bytes),
+  }));
+}
+
+export async function getBtorPhoto(id: string): Promise<BtorPhoto | undefined> {
+  const row = await get<SqlRow>("SELECT id, mission_id, name, mime, bytes FROM mission_photos WHERE id = ?", [id]);
+  if (!row) return undefined;
+  return {
+    id: text(row.id),
+    missionId: text(row.mission_id),
+    name: text(row.name),
+    mime: text(row.mime) || "image/jpeg",
+    bytes: photoBytes(row.bytes),
+  };
+}
+
+export async function replaceBtorPhotos(
+  missionId: string,
+  keepIds: string[],
+  added: { name: string; bytes: Uint8Array }[],
+): Promise<void> {
+  const now = new Date().toISOString();
+  await transaction(async (tx) => {
+    if (keepIds.length) {
+      const marks = keepIds.map(() => "?").join(",");
+      await tx.execute({
+        sql: `DELETE FROM mission_photos WHERE mission_id = ? AND id NOT IN (${marks})`,
+        args: [missionId, ...keepIds],
+      });
+    } else {
+      await tx.execute({ sql: "DELETE FROM mission_photos WHERE mission_id = ?", args: [missionId] });
+    }
+    for (const photo of added) {
+      await tx.execute({
+        sql: "INSERT INTO mission_photos (id, mission_id, name, mime, bytes, created_at) VALUES (?, ?, ?, 'image/jpeg', ?, ?)",
+        args: [crypto.randomUUID(), missionId, photo.name, photo.bytes, now],
+      });
+    }
   });
 }
 

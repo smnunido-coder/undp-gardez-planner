@@ -115,6 +115,15 @@ const SCHEMA = [
     updated_at TEXT NOT NULL,
     updated_by TEXT
   )`,
+  `CREATE TABLE IF NOT EXISTS mission_photos (
+    id TEXT PRIMARY KEY,
+    mission_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    mime TEXT NOT NULL,
+    bytes BLOB NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_mission_photos_mission ON mission_photos(mission_id)`,
 ];
 
 const globalForDb = globalThis as unknown as {

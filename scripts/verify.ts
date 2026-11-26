@@ -129,8 +129,26 @@ await saveBtor(
 const report = await getBtor("MIS-2026-1008");
 assert(report?.findings.includes("Deputy Governor"), "btor saved");
 assert((await getMission("MIS-2026-1008"))?.btorDone === true, "btor marks the mission done");
-const file = await btorDocx(report!);
+const tinyJpeg = Uint8Array.from([
+  0xff, 0xd8, 0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x01, 0x00, 0x01, 0x01, 0x01, 0x11, 0x00, 0xff, 0xd9,
+]);
+const file = await btorDocx(report!, [
+  { id: "P1", missionId: "MIS-2026-1008", name: "meeting.jpg", mime: "image/jpeg", bytes: tinyJpeg },
+]);
 assert(file.subarray(0, 2).toString() === "PK", "word file");
+const packed = await import("jszip").then(async (mod) => {
+  const zip = await mod.default.loadAsync(file);
+  const xml = await zip.file("word/document.xml")!.async("string");
+  const header = await zip.file("word/header1.xml")!.async("string");
+  return { xml, header, hasPhoto: zip.file("word/media/btor-photo-1.jpg") != null };
+});
+assert(packed.xml.includes(">Partner"), "template label");
+assert(packed.xml.includes("UNRT meeting Logar"), "filled partner");
+assert(packed.xml.includes("Deputy Governor"), "filled findings");
+assert(!packed.xml.includes("Cameras/photos were not encouraged"), "sample picture note removed");
+assert(packed.xml.includes("Cameras were not encouraged"), "picture note");
+assert(packed.header.includes("United Nations Development"), "UNDP header");
+assert(packed.hasPhoto, "photo embedded");
 
 console.log("verify ok", { staff: staff.length, projects: projects.length, missions: missions.length, workplans: workplans.length });
 }

@@ -22,6 +22,14 @@ export type BtorReport = {
   pictures: string;
 };
 
+export type BtorPhoto = {
+  id: string;
+  missionId: string;
+  name: string;
+  mime: string;
+  bytes: Uint8Array;
+};
+
 export type Project = {
   id: string;
   name: string;

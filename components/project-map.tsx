@@ -178,7 +178,7 @@ export function ProjectMap({
         {tagging ? <p className="text-sm text-muted-foreground">Tap the map on the village or site.</p> : null}
       </div>
 
-      <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="grid items-start gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(16rem,24rem)]">
         <div className="relative overflow-hidden rounded-lg border border-border bg-[#e7f0f8]">
           <div className="relative z-0 h-[70vh] min-h-[28rem]">
             <OsmMap
@@ -204,19 +204,6 @@ export function ProjectMap({
             <Legend color="#8aa0b3" label="Procurement" />
             <Legend color="#b45309" label="Tagged place" />
           </div>
-          {selected ? (
-            <div className="border-t border-border bg-white p-3">
-              <ProjectOverlay project={selected} onClose={() => setSelectedId("")} />
-            </div>
-          ) : null}
-          {selectedTag ? (
-            <TagOverlay
-              tag={selectedTag}
-              projectName={projects.find((project) => project.id === selectedTag.projectId)?.shortName ?? ""}
-              canDelete={user.isAdmin || selectedTag.createdBy === user.id}
-              onClose={() => setSelectedTagId("")}
-            />
-          ) : null}
           {draft ? (
             <form action={saveMapTagAction} className="absolute inset-x-2 bottom-12 z-[800] space-y-2 rounded-lg border border-border bg-white p-3 shadow-lg sm:inset-x-auto sm:right-3 sm:w-80">
               <input type="hidden" name="lat" value={draft.lat} />
@@ -242,31 +229,54 @@ export function ProjectMap({
           ) : null}
         </div>
 
-        <ul className="max-h-[36rem] space-y-1 overflow-y-auto rounded-lg border border-border bg-white p-1">
-          {visible.length === 0 ? (
-            <li className="p-3 text-sm text-muted-foreground">No projects match.</li>
-          ) : (
-            visible.map((project) => {
-              const latest = project.updates[0];
-              const on = selected?.id === project.id;
-              return (
-                <li key={project.id}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedId(project.id)}
-                    className={`w-full rounded-md px-3 py-2 text-left ${on ? "bg-accent" : "hover:bg-muted"}`}
-                  >
-                    <span className="block text-sm font-medium text-navy">{project.shortName}</span>
-                    <span className="block text-xs text-muted-foreground">
-                      {project.provinces.join(", ")}
-                      {latest ? ` · ${formatDate(latest.date)}` : " · No update yet"}
-                    </span>
-                  </button>
-                </li>
-              );
-            })
-          )}
-        </ul>
+        <aside className="order-first flex h-[50vh] min-h-[16rem] flex-col overflow-hidden rounded-lg border border-border bg-white sm:order-none sm:h-[70vh] sm:min-h-[28rem]">
+          <div className="border-b border-border px-4 py-3">
+            <h2 className="font-semibold text-navy">Project details</h2>
+            <p className="text-xs text-muted-foreground">Tap a pin or a name. The details stay in this box.</p>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {selectedTag ? (
+              <TagOverlay
+                tag={selectedTag}
+                projectName={projects.find((project) => project.id === selectedTag.projectId)?.shortName ?? ""}
+                canDelete={user.isAdmin || selectedTag.createdBy === user.id}
+                onClose={() => setSelectedTagId("")}
+              />
+            ) : selected ? (
+              <ProjectOverlay project={selected} onClose={() => setSelectedId("")} />
+            ) : (
+              <p className="px-4 py-3 text-sm text-muted-foreground">No project selected.</p>
+            )}
+            <ul className="space-y-1 border-t border-border p-1">
+              {visible.length === 0 ? (
+                <li className="p-3 text-sm text-muted-foreground">No projects match.</li>
+              ) : (
+                visible.map((project) => {
+                  const latest = project.updates[0];
+                  const on = selected?.id === project.id;
+                  return (
+                    <li key={project.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedTagId("");
+                          setSelectedId(project.id);
+                        }}
+                        className={`w-full rounded-md px-3 py-2 text-left ${on ? "bg-accent" : "hover:bg-muted"}`}
+                      >
+                        <span className="block text-sm font-medium text-navy">{project.shortName}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {project.provinces.join(", ")}
+                          {latest ? ` · ${formatDate(latest.date)}` : " · No update yet"}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })
+              )}
+            </ul>
+          </div>
+        </aside>
       </div>
     </div>
   );
@@ -284,7 +294,7 @@ function TagOverlay({
   onClose: () => void;
 }) {
   return (
-    <aside className="absolute inset-x-2 bottom-12 z-[800] max-h-[60%] overflow-y-auto rounded-lg border border-border bg-white p-4 shadow-lg sm:inset-x-auto sm:right-3 sm:w-80">
+    <aside className="px-4 py-3">
       <div className="flex items-start justify-between gap-3">
         <h2 className="font-semibold text-navy">{tag.name}</h2>
         <button type="button" onClick={onClose} className="text-sm font-medium text-primary">
@@ -319,7 +329,7 @@ function ProjectOverlay({ project, onClose }: { project: MapProject; onClose: ()
   const percent = progressPercent(project.progress);
   const dates = project.windowText || [project.startDate, project.endDate].filter(Boolean).map((date) => formatDate(date!)).join(" – ");
   return (
-    <aside className="max-h-80 overflow-y-auto">
+    <aside>
       <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
         <h2 className="font-semibold text-navy">{project.shortName}</h2>
         <button type="button" onClick={onClose} className="shrink-0 text-sm font-medium text-primary">

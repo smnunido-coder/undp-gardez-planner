@@ -10,6 +10,7 @@ import { ACTIVITIES, MISSION_STATUSES, PROVINCES } from "@/lib/labels";
 import { loginKey } from "@/lib/names";
 import {
   countActiveAdmins,
+  deleteBtor,
   deleteMission,
   getMission,
   getProject,
@@ -261,6 +262,14 @@ export async function saveMissionAction(formData: FormData) {
     isNew,
   });
   redirect(`/missions/${id}?notice=mission`);
+}
+
+export async function deleteBtorAction(formData: FormData) {
+  await getCurrentUser();
+  const id = cleanLine(formData.get("id"), 40);
+  if (formData.get("confirm") !== "yes" || !id) fail(`/missions/${id}/btor`, "mission");
+  await deleteBtor(id);
+  redirect(`/missions/${id}?notice=btor-deleted`);
 }
 
 export async function deleteMissionAction(formData: FormData) {

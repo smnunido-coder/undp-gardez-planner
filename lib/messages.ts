@@ -2,6 +2,7 @@ export const NOTICES: Record<string, string> = {
   plan: "Week saved. The dashboard now shows this plan to the whole office.",
   day: "Day saved. The dashboard now shows it to the whole office.",
   btor: "Back to office report saved.",
+  "btor-deleted": "Back to office report removed. The mission is still in the log.",
   week: "Work week saved. New plans use these days.",
   staff: "Staff list saved.",
   password: "Password saved.",

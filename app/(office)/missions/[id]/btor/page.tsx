@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { deleteBtorAction } from "@/lib/actions";
 import { Banner } from "@/components/banner";
 import { BtorForm } from "@/components/btor-form";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { draftBtor } from "@/lib/btor-draft";
 import { getBtor, getMission, listBtorPhotoMeta, listStaff } from "@/lib/queries";
@@ -53,6 +55,22 @@ async function Report({
       <Card className="p-4">
         <BtorForm report={report} photos={photos} />
       </Card>
+      {saved ? (
+        <div className="rounded-lg border border-border bg-white p-4">
+          <p className="text-sm font-medium">Remove this report</p>
+          <p className="mt-1 text-sm text-muted-foreground">The mission stays in the log. Photos on this report are removed with it.</p>
+          <form action={deleteBtorAction} className="mt-3 space-y-2">
+            <input type="hidden" name="id" value={mission.id} />
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="confirm" value="yes" required className="size-5 accent-primary" />
+              Yes, delete this report
+            </label>
+            <Button type="submit" variant="destructive" size="sm">
+              Delete report
+            </Button>
+          </form>
+        </div>
+      ) : null}
     </div>
   );
 }

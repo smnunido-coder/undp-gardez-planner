@@ -9,7 +9,7 @@ delete process.env.TURSO_DATABASE_URL;
 async function main() {
 const { loginKey, matchStaff } = await import("../lib/names");
 const { weekStartFor, weekDates, DEFAULT_WORK_DAYS } = await import("../lib/dates");
-const { listStaff, listProjects, listMissions, listWorkplans, listFieldUpdates, getPasswordHash, getStaff, getMission, getBtor, saveBtor, latestBtorsByProject, setPassword, replaceStaffWeek, plansBetween } = await import(
+const { listStaff, listProjects, listMissions, listWorkplans, listFieldUpdates, getPasswordHash, getStaff, getMission, getBtor, saveBtor, deleteBtor, latestBtorsByProject, setPassword, replaceStaffWeek, plansBetween } = await import(
   "../lib/queries"
 );
 const { btorDocx } = await import("../lib/btor-doc");
@@ -131,6 +131,10 @@ assert(report?.findings.includes("Deputy Governor"), "btor saved");
 assert((await getMission("MIS-2026-1008"))?.btorDone === true, "btor marks the mission done");
 const latestReports = await latestBtorsByProject();
 assert(latestReports["REEP-ORD"]?.missionId === "MIS-2026-1008", "latest btor for a visited project");
+await deleteBtor("MIS-2026-1008");
+assert((await getBtor("MIS-2026-1008")) == null, "btor deleted");
+assert((await getMission("MIS-2026-1008"))?.btorDone === false, "mission kept without the report");
+assert((await latestBtorsByProject())["REEP-ORD"] == null, "deleted report leaves the project link");
 const tinyJpeg = Uint8Array.from([
   0xff, 0xd8, 0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x01, 0x00, 0x01, 0x01, 0x01, 0x11, 0x00, 0xff, 0xd9,
 ]);

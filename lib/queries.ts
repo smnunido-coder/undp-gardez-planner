@@ -463,6 +463,18 @@ export async function saveMission(input: Mission & { isNew: boolean }): Promise<
   });
 }
 
+export async function deleteBtor(missionId: string): Promise<void> {
+  const now = new Date().toISOString();
+  await transaction(async (tx) => {
+    await tx.execute({ sql: "DELETE FROM mission_photos WHERE mission_id = ?", args: [missionId] });
+    await tx.execute({ sql: "DELETE FROM mission_reports WHERE mission_id = ?", args: [missionId] });
+    await tx.execute({
+      sql: "UPDATE missions SET btor_done = 0, updated_at = ? WHERE id = ?",
+      args: [now, missionId],
+    });
+  });
+}
+
 export async function deleteMission(id: string): Promise<void> {
   await transaction(async (tx) => {
     await tx.execute({ sql: "DELETE FROM mission_photos WHERE mission_id = ?", args: [id] });

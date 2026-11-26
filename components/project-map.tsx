@@ -173,7 +173,7 @@ export function ProjectMap({
 
       <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="relative overflow-hidden rounded-lg border border-border bg-[#e7f0f8]">
-          <div className="h-[70vh] min-h-[28rem]">
+          <div className="relative z-0 h-[70vh] min-h-[28rem]">
             <OsmMap
               pins={pins}
               focus={focus}
@@ -207,7 +207,7 @@ export function ProjectMap({
             />
           ) : null}
           {draft ? (
-            <form action={saveMapTagAction} className="absolute inset-x-2 bottom-12 z-20 space-y-2 rounded-lg border border-border bg-white p-3 shadow-lg sm:inset-x-auto sm:right-3 sm:w-80">
+            <form action={saveMapTagAction} className="absolute inset-x-2 bottom-12 z-[800] space-y-2 rounded-lg border border-border bg-white p-3 shadow-lg sm:inset-x-auto sm:right-3 sm:w-80">
               <input type="hidden" name="lat" value={draft.lat} />
               <input type="hidden" name="lng" value={draft.lng} />
               <p className="text-sm font-medium text-navy">Tag this place</p>
@@ -273,7 +273,7 @@ function TagOverlay({
   onClose: () => void;
 }) {
   return (
-    <aside className="absolute inset-x-2 bottom-12 z-20 max-h-[60%] overflow-y-auto rounded-lg border border-border bg-white p-4 shadow-lg sm:inset-x-auto sm:right-3 sm:w-80">
+    <aside className="absolute inset-x-2 bottom-12 z-[800] max-h-[60%] overflow-y-auto rounded-lg border border-border bg-white p-4 shadow-lg sm:inset-x-auto sm:right-3 sm:w-80">
       <div className="flex items-start justify-between gap-3">
         <h2 className="font-semibold text-navy">{tag.name}</h2>
         <button type="button" onClick={onClose} className="text-sm font-medium text-primary">
@@ -308,7 +308,7 @@ function ProjectOverlay({ project, onClose }: { project: MapProject; onClose: ()
   const percent = progressPercent(project.progress);
   const dates = project.windowText || [project.startDate, project.endDate].filter(Boolean).map((date) => formatDate(date!)).join(" – ");
   return (
-    <aside className="absolute inset-x-2 bottom-12 z-10 flex h-[68%] flex-col overflow-hidden rounded-lg border border-border bg-white shadow-lg sm:inset-x-auto sm:right-3 sm:top-3 sm:bottom-14 sm:h-auto sm:w-80">
+    <aside className="absolute inset-x-2 bottom-12 z-[800] flex h-[68%] flex-col overflow-hidden rounded-lg border border-border bg-white shadow-lg sm:inset-x-auto sm:right-3 sm:top-3 sm:bottom-14 sm:h-auto sm:w-80">
       <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
         <h2 className="font-semibold text-navy">{project.shortName}</h2>
         <button type="button" onClick={onClose} className="shrink-0 text-sm font-medium text-primary">

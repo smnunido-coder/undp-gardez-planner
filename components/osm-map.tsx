@@ -55,6 +55,7 @@ export function OsmMap({
         handlers.current.onPlace(event.latlng.lat, event.latlng.lng);
       });
       mapRef.current = map;
+      map.invalidateSize();
       setReady(true);
     })();
     return () => {
@@ -76,14 +77,13 @@ export function OsmMap({
       for (const pin of pins) {
         const icon = leaflet.divIcon({
           className: "gardez-pin",
-          html: `<span style="display:block;width:${pin.kind === "tag" ? 16 : 14}px;height:${pin.kind === "tag" ? 16 : 14}px;border-radius:${pin.kind === "tag" ? "2px" : "50%"};background:${pin.color};border:2px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,.45)"></span>`,
-          iconSize: [16, 16],
-          iconAnchor: [8, 8],
+          html: `<span style="display:flex;align-items:center;justify-content:center;width:36px;height:36px"><span style="display:block;width:${pin.kind === "tag" ? 16 : 18}px;height:${pin.kind === "tag" ? 16 : 18}px;border-radius:${pin.kind === "tag" ? "2px" : "50%"};background:${pin.color};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.5)"></span></span>`,
+          iconSize: [36, 36],
+          iconAnchor: [18, 18],
         });
         const marker = leaflet.marker([pin.lat, pin.lng], { icon, title: pin.title }).addTo(map);
         marker.bindTooltip(`${pin.title}${pin.detail ? ` · ${pin.detail}` : ""}`, { direction: "top", offset: [0, -8] });
-        marker.on("click", (event) => {
-          leaflet.DomEvent.stopPropagation(event.originalEvent);
+        marker.on("click", () => {
           if (pin.kind === "project") handlers.current.onProject(pin.id);
           else handlers.current.onTag(pin.id);
         });

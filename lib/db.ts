@@ -124,6 +124,16 @@ const SCHEMA = [
     created_at TEXT NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS idx_mission_photos_mission ON mission_photos(mission_id)`,
+  `CREATE TABLE IF NOT EXISTS map_tags (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    lat REAL NOT NULL,
+    lng REAL NOT NULL,
+    project_id TEXT,
+    note TEXT NOT NULL DEFAULT '',
+    created_by TEXT,
+    created_at TEXT NOT NULL
+  )`,
 ];
 
 const globalForDb = globalThis as unknown as {

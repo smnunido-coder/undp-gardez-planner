@@ -9,7 +9,7 @@ delete process.env.TURSO_DATABASE_URL;
 async function main() {
 const { loginKey, matchStaff } = await import("../lib/names");
 const { weekStartFor, weekDates, DEFAULT_WORK_DAYS } = await import("../lib/dates");
-const { listStaff, listProjects, listMissions, listWorkplans, listFieldUpdates, getPasswordHash, getStaff, getMission, getBtor, saveBtor, deleteBtor, latestBtorsByProject, setPassword, replaceStaffWeek, plansBetween } = await import(
+const { listStaff, listProjects, listMissions, listWorkplans, listFieldUpdates, getPasswordHash, getStaff, getMission, getBtor, saveBtor, deleteBtor, latestBtorsByProject, listMapTags, saveMapTag, deleteMapTag, setPassword, replaceStaffWeek, plansBetween } = await import(
   "../lib/queries"
 );
 const { btorDocx } = await import("../lib/btor-doc");
@@ -155,6 +155,12 @@ assert(!packed.xml.includes("Cameras/photos were not encouraged"), "sample pictu
 assert(packed.xml.includes("Cameras were not encouraged"), "picture note");
 assert(packed.header.includes("United Nations Development"), "UNDP header");
 assert(packed.hasPhoto, "photo embedded");
+
+await saveMapTag({ name: "Yousuf Khail", lat: 32.9, lng: 68.6, projectId: "JICA-ALCC", note: "Water site", createdBy: "STF-11" });
+const tagged = await listMapTags();
+assert(tagged.some((tag) => tag.name === "Yousuf Khail" && tag.projectId === "JICA-ALCC"), "map tag");
+await deleteMapTag(tagged[0]!.id);
+assert((await listMapTags()).length === tagged.length - 1, "map tag removed");
 
 console.log("verify ok", { staff: staff.length, projects: projects.length, missions: missions.length, workplans: workplans.length });
 }

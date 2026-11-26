@@ -2,10 +2,15 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { OsmMap, type MapPin } from "@/components/osm-map";
 import { Badge } from "@/components/ui/badge";
-import { COUNTRY, PROVINCE_SHAPES } from "@/lib/geo/southeast";
+import { Button } from "@/components/ui/button";
+import { fieldClass } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { deleteMapTagAction, saveMapTagAction } from "@/lib/actions";
+import { PROVINCE_SHAPES } from "@/lib/geo/southeast";
 import { progressPercent, statusClass, statusColor } from "@/lib/labels";
-import type { FieldUpdate, Project } from "@/lib/types";
+import type { FieldUpdate, MapTag, Project } from "@/lib/types";
 
 export type MapProject = Project & { updates: FieldUpdate[] };
 
@@ -16,38 +21,6 @@ function formatDate(iso: string): string {
   const monthName = MONTHS[Number(month) - 1];
   if (!year || !monthName || !day) return iso;
   return `${Number(day)} ${monthName} ${year}`;
-}
-
-const WIDTH = 640;
-
-function bounds() {
-  const points = PROVINCE_SHAPES.flatMap((shape) => shape.ring);
-  const lons = points.map((point) => point[0]);
-  const lats = points.map((point) => point[1]);
-  const pad = 0.55;
-  return {
-    minLon: Math.min(...lons) - pad,
-    maxLon: Math.max(...lons) + pad,
-    minLat: Math.min(...lats) - pad,
-    maxLat: Math.max(...lats) + pad,
-  };
-}
-
-const FRAME = bounds();
-const X_SCALE = Math.cos((((FRAME.minLat + FRAME.maxLat) / 2) * Math.PI) / 180);
-const LON_SPAN = (FRAME.maxLon - FRAME.minLon) * X_SCALE;
-const LAT_SPAN = FRAME.maxLat - FRAME.minLat;
-const HEIGHT = Math.round(WIDTH * (LAT_SPAN / LON_SPAN));
-
-function xy(lon: number, lat: number): [number, number] {
-  return [
-    ((lon - FRAME.minLon) * X_SCALE / LON_SPAN) * WIDTH,
-    ((FRAME.maxLat - lat) / LAT_SPAN) * HEIGHT,
-  ];
-}
-
-function pathOf(ring: [number, number][]): string {
-  return `${ring.map((point, index) => `${index === 0 ? "M" : "L"}${xy(point[0], point[1]).join(" ")}`).join("")}Z`;
 }
 
 function centroid(ring: [number, number][]): [number, number] {
@@ -68,14 +41,21 @@ function dateLabel(update: FieldUpdate): string {
 
 export function ProjectMap({
   projects,
+  tags,
+  user,
   initialId,
 }: {
   projects: MapProject[];
+  tags: MapTag[];
+  user: { id: string; isAdmin: boolean };
   initialId?: string;
 }) {
   const [programme, setProgramme] = useState("");
   const [province, setProvince] = useState("");
   const [selectedId, setSelectedId] = useState(initialId ?? "");
+  const [selectedTagId, setSelectedTagId] = useState("");
+  const [tagging, setTagging] = useState(false);
+  const [draft, setDraft] = useState<{ lat: number; lng: number } | null>(null);
 
   const programmes = useMemo(
     () => [...new Set(projects.map((project) => project.programme))],
@@ -91,36 +71,58 @@ export function ProjectMap({
     [projects, programme, province],
   );
   const selected = visible.find((project) => project.id === selectedId) ?? null;
+  const selectedTag = tags.find((tag) => tag.id === selectedTagId) ?? null;
 
   const pins = useMemo(() => {
     const byProvince = new Map<string, MapProject[]>();
     for (const project of visible) {
-      for (const name of project.provinces) {
-        if (!CENTROIDS.has(name)) continue;
-        const list = byProvince.get(name) ?? [];
-        list.push(project);
-        byProvince.set(name, list);
-      }
+      const name = project.provinces.find((provinceName) => CENTROIDS.has(provinceName));
+      if (!name) continue;
+      const list = byProvince.get(name) ?? [];
+      list.push(project);
+      byProvince.set(name, list);
     }
-    const placed: { key: string; project: MapProject; province: string; x: number; y: number }[] = [];
+    const placed: MapPin[] = [];
     for (const [name, items] of byProvince) {
       const center = CENTROIDS.get(name);
       if (!center) continue;
-      const [cx, cy] = xy(center[0], center[1]);
       items.forEach((project, index) => {
-        const radius = items.length === 1 ? 0 : 16 + Math.floor(index / 8) * 14;
-        const angle = (index / items.length) * Math.PI * 2 - Math.PI / 2;
+        const radius = items.length === 1 ? 0 : 0.06;
+        const angle = (index / items.length) * Math.PI * 2;
         placed.push({
-          key: `${project.id}:${name}`,
-          project,
-          province: name,
-          x: cx + Math.cos(angle) * radius,
-          y: cy + Math.sin(angle) * radius,
+          id: project.id,
+          lat: center[1] + Math.sin(angle) * radius,
+          lng: center[0] + Math.cos(angle) * radius,
+          title: project.shortName,
+          detail: name,
+          color: statusColor(project.status),
+          kind: "project",
         });
       });
     }
+    for (const tag of tags) {
+      const linked = projects.find((project) => project.id === tag.projectId);
+      if (programme && linked?.programme !== programme) continue;
+      if (province && linked && !linked.provinces.includes(province)) continue;
+      placed.push({
+        id: tag.id,
+        lat: tag.lat,
+        lng: tag.lng,
+        title: tag.name,
+        detail: linked?.shortName ?? "Tagged place",
+        color: "#b45309",
+        kind: "tag",
+      });
+    }
     return placed;
-  }, [visible]);
+  }, [visible, tags, projects, programme, province]);
+
+  const focus = useMemo(() => {
+    const name = province || selected?.provinces.find((item) => CENTROIDS.has(item));
+    const center = name ? CENTROIDS.get(name) : undefined;
+    if (!center) return null;
+    return { lng: center[0], lat: center[1], zoom: province ? 9 : 8 };
+  }, [province, selected]);
 
   return (
     <div className="space-y-3">
@@ -153,88 +155,80 @@ export function ProjectMap({
         </select>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant={tagging ? "default" : "outline"}
+          onClick={() => {
+            setTagging((current) => !current);
+            setDraft(null);
+            setSelectedId("");
+            setSelectedTagId("");
+          }}
+        >
+          {tagging ? "Stop tagging" : "Tag a place"}
+        </Button>
+        {tagging ? <p className="text-sm text-muted-foreground">Tap the map on the village or site.</p> : null}
+      </div>
+
       <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="relative overflow-hidden rounded-lg border border-border bg-[#e7f0f8]">
-          <svg
-            viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-            className="h-auto w-full touch-manipulation"
-            role="img"
-            aria-label="Map of UNDP South-East projects by province"
-          >
-            <path d={pathOf(COUNTRY)} fill="#d5e2ee" stroke="#b7c9d8" strokeWidth="1.5" />
-            {PROVINCE_SHAPES.map((shape) => {
-              const active = province === shape.name;
-              return (
-                <path
-                  key={shape.name}
-                  d={pathOf(shape.ring)}
-                  fill={active ? "#c5e2f6" : "#f7fbfe"}
-                  stroke={active ? "#0468b1" : "#7f9bb0"}
-                  strokeWidth={active ? 2.5 : 1.25}
-                  className="cursor-pointer"
-                  onClick={() => setProvince((current) => (current === shape.name ? "" : shape.name))}
-                >
-                  <title>{shape.name}</title>
-                </path>
-              );
-            })}
-            {pins.map((pin) => {
-              const on = selected?.id === pin.project.id;
-              return (
-                <g
-                  key={pin.key}
-                  transform={`translate(${pin.x} ${pin.y})`}
-                  className="cursor-pointer"
-                  onClick={() => setSelectedId(pin.project.id)}
-                >
-                  <circle r="16" fill="transparent" />
-                  <circle
-                    r={on ? 9 : 7}
-                    fill={statusColor(pin.project.status)}
-                    stroke={on ? "#003865" : "#ffffff"}
-                    strokeWidth={on ? 3 : 2}
-                    opacity={pin.project.active ? 1 : 0.45}
-                  />
-                  <title>
-                    {pin.project.shortName} · {pin.province}
-                  </title>
-                </g>
-              );
-            })}
-            {PROVINCE_SHAPES.map((shape) => {
-              const center = CENTROIDS.get(shape.name);
-              if (!center) return null;
-              const [x, y] = xy(center[0], center[1]);
-              const count = pins.filter((pin) => pin.province === shape.name).length;
-              const radius = count <= 1 ? 0 : 16 + Math.floor((count - 1) / 8) * 14;
-              const above = y - radius - 18;
-              const labelY = above > 16 ? above : y + radius + 18;
-              return (
-                <text
-                  key={`${shape.name}-label`}
-                  x={x}
-                  y={labelY}
-                  textAnchor="middle"
-                  fill="#003865"
-                  stroke="#f4f7fb"
-                  strokeWidth="5"
-                  paintOrder="stroke"
-                  fontSize="13"
-                  fontWeight="600"
-                  style={{ pointerEvents: "none" }}
-                >
-                  {shape.name}
-                </text>
-              );
-            })}
-          </svg>
+          <div className="h-[70vh] min-h-[28rem]">
+            <OsmMap
+              pins={pins}
+              focus={focus}
+              tagging={tagging}
+              onProject={(id) => {
+                setSelectedTagId("");
+                setDraft(null);
+                setSelectedId(id);
+              }}
+              onTag={(id) => {
+                setSelectedId("");
+                setDraft(null);
+                setSelectedTagId(id);
+              }}
+              onPlace={(lat, lng) => setDraft({ lat, lng })}
+            />
+          </div>
           <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-border bg-white/90 px-3 py-2 text-xs text-muted-foreground">
             <Legend color="#0468b1" label="Ongoing" />
             <Legend color="#5b8eb8" label="Planned" />
             <Legend color="#8aa0b3" label="Procurement" />
-            <Legend color="#b45309" label="Closing" />
+            <Legend color="#b45309" label="Tagged place" />
           </div>
           {selected ? <ProjectOverlay project={selected} onClose={() => setSelectedId("")} /> : null}
+          {selectedTag ? (
+            <TagOverlay
+              tag={selectedTag}
+              projectName={projects.find((project) => project.id === selectedTag.projectId)?.shortName ?? ""}
+              canDelete={user.isAdmin || selectedTag.createdBy === user.id}
+              onClose={() => setSelectedTagId("")}
+            />
+          ) : null}
+          {draft ? (
+            <form action={saveMapTagAction} className="absolute inset-x-2 bottom-12 z-20 space-y-2 rounded-lg border border-border bg-white p-3 shadow-lg sm:inset-x-auto sm:right-3 sm:w-80">
+              <input type="hidden" name="lat" value={draft.lat} />
+              <input type="hidden" name="lng" value={draft.lng} />
+              <p className="text-sm font-medium text-navy">Tag this place</p>
+              <input className={fieldClass} name="name" required maxLength={120} placeholder="Place name, e.g. Yousuf Khail" aria-label="Place name" />
+              <select className={fieldClass} name="projectId" defaultValue="" aria-label="Project">
+                <option value="">No project</option>
+                {projects.filter((project) => project.active).map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.shortName}
+                  </option>
+                ))}
+              </select>
+              <Textarea name="note" maxLength={1000} placeholder="What is here" aria-label="Note" />
+              <div className="flex gap-2">
+                <Button type="submit">Save tag</Button>
+                <Button type="button" variant="outline" onClick={() => setDraft(null)}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          ) : null}
         </div>
 
         <ul className="max-h-[36rem] space-y-1 overflow-y-auto rounded-lg border border-border bg-white p-1">
@@ -264,6 +258,40 @@ export function ProjectMap({
         </ul>
       </div>
     </div>
+  );
+}
+
+function TagOverlay({
+  tag,
+  projectName,
+  canDelete,
+  onClose,
+}: {
+  tag: MapTag;
+  projectName: string;
+  canDelete: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <aside className="absolute inset-x-2 bottom-12 z-20 max-h-[60%] overflow-y-auto rounded-lg border border-border bg-white p-4 shadow-lg sm:inset-x-auto sm:right-3 sm:w-80">
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="font-semibold text-navy">{tag.name}</h2>
+        <button type="button" onClick={onClose} className="text-sm font-medium text-primary">
+          Close
+        </button>
+      </div>
+      <p className="mt-2 text-sm text-muted-foreground">{projectName || "No project linked"}</p>
+      {tag.note ? <p className="mt-2 text-sm leading-5">{tag.note}</p> : null}
+      {tag.createdByName ? <p className="mt-2 text-xs text-muted-foreground">Tagged by {tag.createdByName}</p> : null}
+      {canDelete ? (
+        <form action={deleteMapTagAction} className="mt-3">
+          <input type="hidden" name="id" value={tag.id} />
+          <Button type="submit" variant="destructive" size="sm">
+            Remove tag
+          </Button>
+        </form>
+      ) : null}
+    </aside>
   );
 }
 

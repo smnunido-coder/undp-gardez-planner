@@ -12,6 +12,8 @@ import {
   countActiveAdmins,
   deleteBtor,
   deleteMission,
+  deleteMapTag,
+  getMapTag,
   getMission,
   getProject,
   getPasswordHash,
@@ -20,6 +22,7 @@ import {
   listProjects,
   listStaff,
   replaceStaffWeek,
+  saveMapTag,
   saveMission,
   saveProject,
   saveStaff,
@@ -262,6 +265,30 @@ export async function saveMissionAction(formData: FormData) {
     isNew,
   });
   redirect(`/missions/${id}?notice=mission`);
+}
+
+export async function saveMapTagAction(formData: FormData) {
+  const user = await getCurrentUser();
+  const name = cleanLine(formData.get("name"), 120);
+  const lat = Number(formData.get("lat"));
+  const lng = Number(formData.get("lng"));
+  const projectId = cleanLine(formData.get("projectId"), 80);
+  const note = cleanNote(formData.get("note"), 1000);
+  const inside = Number.isFinite(lat) && Number.isFinite(lng) && lat >= 29 && lat <= 39 && lng >= 60 && lng <= 75;
+  if (!name || !inside) fail("/map", "tag");
+  if (projectId && !(await listProjects()).some((project) => project.id === projectId)) fail("/map", "tag");
+  await saveMapTag({ name, lat, lng, projectId: projectId || null, note, createdBy: user.id });
+  notice("/map", "tag");
+}
+
+export async function deleteMapTagAction(formData: FormData) {
+  const user = await getCurrentUser();
+  const id = cleanLine(formData.get("id"), 40);
+  const tag = id ? await getMapTag(id) : undefined;
+  if (!tag) redirect("/map");
+  if (tag.createdBy !== user.id && !user.isAdmin) fail("/map", "tag");
+  await deleteMapTag(id);
+  notice("/map", "tag-deleted");
 }
 
 export async function deleteBtorAction(formData: FormData) {

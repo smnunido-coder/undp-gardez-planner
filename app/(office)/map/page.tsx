@@ -1,6 +1,8 @@
 import { Suspense } from "react";
+import { Banner } from "@/components/banner";
 import { ProjectMap, type MapProject } from "@/components/project-map";
-import { listFieldUpdates, listProjects } from "@/lib/queries";
+import { getCurrentUser } from "@/lib/auth";
+import { listFieldUpdates, listMapTags, listProjects } from "@/lib/queries";
 import { one } from "@/lib/utils";
 
 export const metadata = { title: "Map" };
@@ -23,7 +25,8 @@ async function Map({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const [projects, updates] = await Promise.all([listProjects(), listFieldUpdates()]);
+  const user = await getCurrentUser();
+  const [projects, updates, tags] = await Promise.all([listProjects(), listFieldUpdates(), listMapTags()]);
   const mapped: MapProject[] = projects.map((project) => ({
     ...project,
     updates: updates[project.id] ?? [],
@@ -36,10 +39,11 @@ async function Map({
       <div>
         <h1 className="text-2xl font-semibold text-navy">Project map</h1>
         <p className="text-sm text-muted-foreground">
-          {projects.length} projects across the South-East. A pin marks the province. Open one for the full description and the latest mission or weekly plan.
+          OpenStreetMap of the South-East. Zoom into a district, open a project pin, or tag a village.
         </p>
       </div>
-      <ProjectMap projects={mapped} initialId={initialId} />
+      <Banner notice={one(params.notice)} error={one(params.error)} />
+      <ProjectMap projects={mapped} tags={tags} user={{ id: user.id, isAdmin: user.isAdmin }} initialId={initialId} />
     </div>
   );
 }

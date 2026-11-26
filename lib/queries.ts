@@ -2,7 +2,7 @@ import { all, get, run, transaction } from "@/lib/db";
 import { hashPassword } from "@/lib/passwords";
 import { DEFAULT_WORK_DAYS, normalizeWorkDays } from "@/lib/dates";
 import { activityLabel } from "@/lib/labels";
-import type { BtorPhoto, BtorReport, DayDraft, FieldUpdate, Mission, PlanDay, PlanProject, Project, Staff, WorkplanItem } from "@/lib/types";
+import type { BtorPhoto, BtorReport, DayDraft, FieldUpdate, MapTag, Mission, PlanDay, PlanProject, Project, Staff, WorkplanItem } from "@/lib/types";
 
 type SqlRow = Record<string, unknown>;
 
@@ -355,6 +355,58 @@ export async function replaceStaffWeek(staffId: string, weekStart: string, days:
       }
     }
   });
+}
+
+export async function listMapTags(): Promise<MapTag[]> {
+  const rows = await all<SqlRow>(
+    `SELECT t.*, s.full_name
+     FROM map_tags t
+     LEFT JOIN staff s ON s.id = t.created_by
+     ORDER BY t.created_at DESC`,
+  );
+  return rows.map((row) => ({
+    id: text(row.id),
+    name: text(row.name),
+    lat: Number(row.lat),
+    lng: Number(row.lng),
+    projectId: row.project_id ? text(row.project_id) : null,
+    note: text(row.note),
+    createdBy: row.created_by ? text(row.created_by) : null,
+    createdByName: text(row.full_name),
+  }));
+}
+
+export async function getMapTag(id: string): Promise<MapTag | undefined> {
+  const tags = await listMapTags();
+  return tags.find((tag) => tag.id === id);
+}
+
+export async function saveMapTag(input: {
+  name: string;
+  lat: number;
+  lng: number;
+  projectId: string | null;
+  note: string;
+  createdBy: string;
+}): Promise<void> {
+  await run(
+    `INSERT INTO map_tags (id, name, lat, lng, project_id, note, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      crypto.randomUUID(),
+      input.name,
+      input.lat,
+      input.lng,
+      input.projectId,
+      input.note,
+      input.createdBy,
+      new Date().toISOString(),
+    ],
+  );
+}
+
+export async function deleteMapTag(id: string): Promise<void> {
+  await run("DELETE FROM map_tags WHERE id = ?", [id]);
 }
 
 export async function listWeekStarts(): Promise<string[]> {

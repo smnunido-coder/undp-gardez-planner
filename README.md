@@ -60,7 +60,7 @@ SQLite on the Vercel filesystem does not keep writes. Production uses [Turso](ht
 - **Dashboard.** Staff × day grid for the selected week, filters (week, staff, project, programme, province), staff-day counts, who is in the field today (site visit, monitoring, or travel), earlier weeks, CSV and Excel export.
 - **My week.** For each working day, tick one or more projects, and optionally set province, district, activity (site visit, monitoring, meeting, office work, travel), and a note. Each day saves on its own. Current and upcoming weeks can be edited. An admin can file any colleague's week, including past weeks.
 - **Projects.** The 24 seeded projects, with programme, partner, provinces, status, dates, budget, and progress.
-- **Map.** The same projects as pins on the South-East provinces. Open a pin for the full project record and the latest mission or weekly-plan note. The map is drawn in the page, with no map-tile download.
+- **Map.** An OpenStreetMap of the South-East that zooms from province to village. Project pins open the project record. Anyone signed in can tag a place and link it to a project.
 - **Missions.** Log of trips. Anyone signed in can add or edit dates, location, projects, travellers, purpose, status, and whether the BTOR is done. Open a mission, enter the report, and add photos. Download Word fills the UNDP field-visit template.
 - **Workplans.** Partner activities as a month-by-month bar chart.
 - **Password.** Each person can change their own password. It can be any text, of any length. An admin can set anyone's password from the staff form. Leave that box blank to keep the current password.
@@ -72,7 +72,7 @@ If two active staff share a last name, sign-in shows a list of full names.
 
 - Last name plus a password, and a 60-day cookie. Passwords are stored as a salted hash. There is no length or character rule. The cookie also carries a session number, so changing a password signs out phones that were already in.
 - English UI, UNDP blue (`#0468b1` / `#003865`), system fonts, server-rendered pages, and no chart or map-tile library, so the pages stay small on a slow connection.
-- Map pins sit on the province. The office list records provinces, not GPS points for each site.
+- Project pins sit on the province, because the office list records provinces. A tag is a point someone places by tapping the map.
 - One SQLite schema for laptop and Turso. Dates use the Asia/Kabul calendar.
 - “In the field today” means the activity is a site visit, monitoring, or travel.
 - A project staff-day is one person including that project on one day. A province staff-day is one person on one day, using the province they set (or, if they left it blank, a province on the chosen project).

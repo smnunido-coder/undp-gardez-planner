@@ -30,6 +30,17 @@ export type BtorPhoto = {
   bytes: Uint8Array;
 };
 
+export type MapTag = {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  projectId: string | null;
+  note: string;
+  createdBy: string | null;
+  createdByName: string;
+};
+
 export type Project = {
   id: string;
   name: string;

@@ -2,7 +2,7 @@ import { all, get, run, transaction } from "@/lib/db";
 import { hashPassword } from "@/lib/passwords";
 import { DEFAULT_WORK_DAYS, normalizeWorkDays } from "@/lib/dates";
 import { activityLabel } from "@/lib/labels";
-import type { DayDraft, FieldUpdate, Mission, PlanDay, PlanProject, Project, Staff, WorkplanItem } from "@/lib/types";
+import type { BtorReport, DayDraft, FieldUpdate, Mission, PlanDay, PlanProject, Project, Staff, WorkplanItem } from "@/lib/types";
 
 type SqlRow = Record<string, unknown>;
 
@@ -38,6 +38,7 @@ function mapStaff(row: SqlRow): Staff {
     role: text(row.role),
     isAdmin: flag(row.is_admin),
     active: flag(row.active),
+    sessionVersion: Number(row.session_version ?? 1) || 1,
   };
 }
 
@@ -134,7 +135,10 @@ export async function getPasswordHash(id: string): Promise<string> {
 }
 
 export async function setPassword(id: string, password: string): Promise<void> {
-  await run("UPDATE staff SET password_hash = ? WHERE id = ?", [await hashPassword(password), id]);
+  await run(
+    "UPDATE staff SET password_hash = ?, session_version = session_version + 1 WHERE id = ?",
+    [await hashPassword(password), id],
+  );
 }
 
 export async function saveStaff(input: {
@@ -173,14 +177,17 @@ export async function saveStaff(input: {
     ]);
     return;
   }
-  await run("UPDATE staff SET full_name = ?, role = ?, is_admin = ?, active = ?, password_hash = ? WHERE id = ?", [
-    input.fullName,
-    input.role,
-    input.isAdmin ? 1 : 0,
-    input.active ? 1 : 0,
-    await hashPassword(input.password),
-    input.id,
-  ]);
+  await run(
+    "UPDATE staff SET full_name = ?, role = ?, is_admin = ?, active = ?, password_hash = ?, session_version = session_version + 1 WHERE id = ?",
+    [
+      input.fullName,
+      input.role,
+      input.isAdmin ? 1 : 0,
+      input.active ? 1 : 0,
+      await hashPassword(input.password),
+      input.id,
+    ],
+  );
 }
 
 export async function listProjects(): Promise<Project[]> {
@@ -437,9 +444,77 @@ export async function saveMission(input: Mission & { isNew: boolean }): Promise<
 
 export async function deleteMission(id: string): Promise<void> {
   await transaction(async (tx) => {
+    await tx.execute({ sql: "DELETE FROM mission_reports WHERE mission_id = ?", args: [id] });
     await tx.execute({ sql: "DELETE FROM mission_projects WHERE mission_id = ?", args: [id] });
     await tx.execute({ sql: "DELETE FROM mission_staff WHERE mission_id = ?", args: [id] });
     await tx.execute({ sql: "DELETE FROM missions WHERE id = ?", args: [id] });
+  });
+}
+
+function mapBtor(row: SqlRow): BtorReport {
+  return {
+    missionId: text(row.mission_id),
+    partnerName: text(row.partner_name),
+    staffText: text(row.staff_text),
+    datesText: text(row.dates_text),
+    locationText: text(row.location_text),
+    objectives: text(row.objectives),
+    activities: text(row.activities),
+    findings: text(row.findings),
+    challenges: text(row.challenges),
+    recommendations: text(row.recommendations),
+    stakeholders: text(row.stakeholders),
+    pictures: text(row.pictures),
+  };
+}
+
+export async function getBtor(missionId: string): Promise<BtorReport | undefined> {
+  const row = await get<SqlRow>("SELECT * FROM mission_reports WHERE mission_id = ?", [missionId]);
+  return row ? mapBtor(row) : undefined;
+}
+
+export async function saveBtor(report: BtorReport, staffId: string): Promise<void> {
+  const now = new Date().toISOString();
+  await transaction(async (tx) => {
+    await tx.execute({
+      sql: `INSERT INTO mission_reports
+        (mission_id, partner_name, staff_text, dates_text, location_text, objectives, activities, findings, challenges, recommendations, stakeholders, pictures, updated_at, updated_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(mission_id) DO UPDATE SET
+          partner_name = excluded.partner_name,
+          staff_text = excluded.staff_text,
+          dates_text = excluded.dates_text,
+          location_text = excluded.location_text,
+          objectives = excluded.objectives,
+          activities = excluded.activities,
+          findings = excluded.findings,
+          challenges = excluded.challenges,
+          recommendations = excluded.recommendations,
+          stakeholders = excluded.stakeholders,
+          pictures = excluded.pictures,
+          updated_at = excluded.updated_at,
+          updated_by = excluded.updated_by`,
+      args: [
+        report.missionId,
+        report.partnerName,
+        report.staffText,
+        report.datesText,
+        report.locationText,
+        report.objectives,
+        report.activities,
+        report.findings,
+        report.challenges,
+        report.recommendations,
+        report.stakeholders,
+        report.pictures,
+        now,
+        staffId,
+      ],
+    });
+    await tx.execute({
+      sql: "UPDATE missions SET btor_done = 1, updated_at = ? WHERE id = ?",
+      args: [now, report.missionId],
+    });
   });
 }
 

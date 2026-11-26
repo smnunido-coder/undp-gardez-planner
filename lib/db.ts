@@ -6,9 +6,10 @@ import { PLANS } from "@/data/seed/plans";
 import { PROJECTS } from "@/data/seed/projects";
 import { STAFF } from "@/data/seed/staff";
 import { WORKPLANS } from "@/data/seed/workplans";
+import { PASSWORD_RESETS } from "@/data/seed/password-resets";
 import { DEFAULT_WORK_DAYS, parseWindow } from "@/lib/dates";
 import { loginKey } from "@/lib/names";
-import { hashPassword } from "@/lib/passwords";
+import { hashPassword, verifyPassword } from "@/lib/passwords";
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS staff (
@@ -18,6 +19,7 @@ const SCHEMA = [
     is_admin INTEGER NOT NULL DEFAULT 0,
     active INTEGER NOT NULL DEFAULT 1,
     password_hash TEXT NOT NULL DEFAULT '',
+    session_version INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS projects (
@@ -97,6 +99,22 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS idx_plan_days_staff ON plan_days(staff_id)`,
   `CREATE INDEX IF NOT EXISTS idx_missions_dates ON missions(start_date, end_date)`,
   `CREATE INDEX IF NOT EXISTS idx_workplans_partner ON workplan_items(partner)`,
+  `CREATE TABLE IF NOT EXISTS mission_reports (
+    mission_id TEXT PRIMARY KEY,
+    partner_name TEXT NOT NULL DEFAULT '',
+    staff_text TEXT NOT NULL DEFAULT '',
+    dates_text TEXT NOT NULL DEFAULT '',
+    location_text TEXT NOT NULL DEFAULT '',
+    objectives TEXT NOT NULL DEFAULT '',
+    activities TEXT NOT NULL DEFAULT '',
+    findings TEXT NOT NULL DEFAULT '',
+    challenges TEXT NOT NULL DEFAULT '',
+    recommendations TEXT NOT NULL DEFAULT '',
+    stakeholders TEXT NOT NULL DEFAULT '',
+    pictures TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL,
+    updated_by TEXT
+  )`,
 ];
 
 const globalForDb = globalThis as unknown as {
@@ -278,20 +296,36 @@ async function init() {
   await ensurePasswords(client);
 }
 
-async function ensurePasswords(client: Client) {
+async function addColumn(client: Client, sql: string) {
   try {
-    await client.execute("ALTER TABLE staff ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''");
+    await client.execute(sql);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (!/duplicate column/i.test(message)) throw error;
   }
+}
+
+async function ensurePasswords(client: Client) {
+  await addColumn(client, "ALTER TABLE staff ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''");
+  await addColumn(client, "ALTER TABLE staff ADD COLUMN session_version INTEGER NOT NULL DEFAULT 1");
   const rows = await client.execute("SELECT id, full_name, password_hash FROM staff");
   for (const row of rows.rows) {
-    if (String(row.password_hash ?? "") !== "") continue;
-    const hash = await hashPassword(loginKey(String(row.full_name)));
+    const id = String(row.id);
+    const current = String(row.password_hash ?? "");
+    const replacement = PASSWORD_RESETS[id];
+    if (!current) {
+      const hash = replacement ?? (await hashPassword(loginKey(String(row.full_name))));
+      await client.execute({
+        sql: "UPDATE staff SET password_hash = ? WHERE id = ? AND password_hash = ''",
+        args: [hash, id],
+      });
+      continue;
+    }
+    if (!replacement) continue;
+    if (!(await verifyPassword(loginKey(String(row.full_name)), current))) continue;
     await client.execute({
-      sql: "UPDATE staff SET password_hash = ? WHERE id = ? AND password_hash = ''",
-      args: [hash, String(row.id)],
+      sql: "UPDATE staff SET password_hash = ?, session_version = session_version + 1 WHERE id = ?",
+      args: [replacement, id],
     });
   }
 }

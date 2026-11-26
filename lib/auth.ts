@@ -8,7 +8,7 @@ import type { Staff } from "@/lib/types";
 const COOKIE = "gardez_session";
 const MAX_AGE_SECONDS = 60 * 24 * 60 * 60;
 
-type SessionPayload = { staffId: string; exp: number };
+type SessionPayload = { staffId: string; exp: number; v: number };
 
 function secret(): string {
   const value = process.env.SESSION_SECRET;
@@ -28,9 +28,9 @@ function cookieBase() {
   };
 }
 
-function sign(staffId: string, now: number): string {
+function sign(staffId: string, sessionVersion: number, now: number): string {
   const body = Buffer.from(
-    JSON.stringify({ staffId, exp: now + MAX_AGE_SECONDS * 1000 } satisfies SessionPayload),
+    JSON.stringify({ staffId, exp: now + MAX_AGE_SECONDS * 1000, v: sessionVersion } satisfies SessionPayload),
     "utf8",
   ).toString("base64url");
   const signature = createHmac("sha256", secret()).update(body).digest("base64url");
@@ -46,24 +46,26 @@ function readToken(token: string, now: number): SessionPayload | null {
   if (left.length !== right.length || !timingSafeEqual(left, right)) return null;
   try {
     const parsed = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as SessionPayload;
-    if (!parsed.staffId || typeof parsed.exp !== "number" || parsed.exp < now) return null;
+    if (!parsed.staffId || typeof parsed.exp !== "number" || parsed.exp < now || typeof parsed.v !== "number") return null;
     return parsed;
   } catch {
     return null;
   }
 }
 
-export function sessionCookie(staffId: string) {
+export function sessionCookie(staffId: string, sessionVersion: number) {
   return {
     name: COOKIE,
-    value: sign(staffId, Date.now()),
+    value: sign(staffId, sessionVersion, Date.now()),
     options: { ...cookieBase(), maxAge: MAX_AGE_SECONDS },
   };
 }
 
 export async function setSession(staffId: string): Promise<void> {
   await connection();
-  const cookie = sessionCookie(staffId);
+  const staff = await getStaff(staffId);
+  if (!staff) return;
+  const cookie = sessionCookie(staff.id, staff.sessionVersion);
   const jar = await cookies();
   jar.set(cookie.name, cookie.value, cookie.options);
 }
@@ -88,7 +90,7 @@ export async function getOptionalUser(): Promise<Staff | null> {
     return null;
   }
   const staff = await getStaff(session.staffId);
-  if (!staff || !staff.active) {
+  if (!staff || !staff.active || staff.sessionVersion !== session.v) {
     await clearSession();
     return null;
   }

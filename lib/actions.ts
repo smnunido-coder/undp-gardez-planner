@@ -58,6 +58,7 @@ export async function changePassword(formData: FormData) {
   const hash = await getPasswordHash(user.id);
   if (!(await verifyPassword(current, hash))) fail("/password", "password");
   await setPassword(user.id, next);
+  await setSession(user.id);
   notice("/password", "password");
 }
 
@@ -106,6 +107,42 @@ export async function saveWeek(formData: FormData) {
   redirect(`/plan?week=${weekStart}&notice=plan`);
 }
 
+export async function saveDay(formData: FormData) {
+  const user = await getCurrentUser();
+  const staffId = cleanLine(formData.get("staffId"), 40) || user.id;
+  const day = cleanLine(formData.get("day"), 10);
+  const weekStart = cleanLine(formData.get("weekStart"), 10);
+  if (staffId !== user.id && !user.isAdmin) fail("/plan", "closed");
+  const workDays = await getWorkDays();
+  const dates = weekDates(weekStart, workDays);
+  const back = `/plan?week=${encodeURIComponent(weekStart)}&staff=${encodeURIComponent(staffId)}`;
+  if (!dates.includes(day) || dates[0] !== weekStart) fail(back, "week");
+  await connection();
+  const today = kabulToday(new Date());
+  if (!canEditWeek(dates, today, user.isAdmin)) fail(back, "closed");
+
+  const known = new Set((await listProjects()).map((project) => project.id));
+  const provinces = new Set<string>(PROVINCES);
+  const activities = new Set<string>(ACTIVITIES.map((item) => item.id));
+  const province = cleanLine(formData.get("province"), 80);
+  const activity = cleanLine(formData.get("activity"), 40);
+  const draft: DayDraft = {
+    day,
+    province: provinces.has(province) ? province : "",
+    location: cleanLine(formData.get("location"), 200),
+    activity: activities.has(activity) ? activity : "",
+    note: cleanNote(formData.get("note"), 1000),
+    projectIds: [],
+  };
+  for (const value of formData.getAll("project")) {
+    const projectId = String(value).split("|").pop() ?? "";
+    if (!known.has(projectId) || draft.projectIds.includes(projectId)) continue;
+    draft.projectIds.push(projectId);
+  }
+  await replaceStaffWeek(staffId, weekStart, [draft]);
+  redirect(`${back}&notice=day`);
+}
+
 export async function saveWorkWeek(formData: FormData) {
   await requireAdmin();
   const picked = AFGHAN_WEEK.filter((day) => formData.getAll("day").map(Number).includes(day));
@@ -136,8 +173,10 @@ export async function saveStaffAction(formData: FormData) {
 
   const id = isNew ? `STF-${crypto.randomUUID().slice(0, 8)}` : existingId;
   const typed = String(formData.get("password") ?? "");
-  const password = typed.length > 0 ? typed : isNew ? loginKey(fullName) : null;
+  if (isNew && typed.length === 0) fail(`/admin?staff=new`, "password-needed");
+  const password = typed.length > 0 ? typed : null;
   await saveStaff({ id, fullName, role, isAdmin, active, isNew, password });
+  if (password !== null && id === (await getCurrentUser()).id) await setSession(id);
   notice("/admin", "staff");
 }
 

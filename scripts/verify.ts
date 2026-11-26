@@ -9,9 +9,10 @@ delete process.env.TURSO_DATABASE_URL;
 async function main() {
 const { loginKey, matchStaff } = await import("../lib/names");
 const { weekStartFor, weekDates, DEFAULT_WORK_DAYS } = await import("../lib/dates");
-const { listStaff, listProjects, listMissions, listWorkplans, listFieldUpdates, getPasswordHash, setPassword, replaceStaffWeek, plansBetween } = await import(
+const { listStaff, listProjects, listMissions, listWorkplans, listFieldUpdates, getPasswordHash, getStaff, getMission, getBtor, saveBtor, setPassword, replaceStaffWeek, plansBetween } = await import(
   "../lib/queries"
 );
+const { btorDocx } = await import("../lib/btor-doc");
 const { verifyPassword } = await import("../lib/passwords");
 const { PROVINCE_SHAPES } = await import("../lib/geo/southeast");
 
@@ -38,9 +39,10 @@ assert(staff.filter((person) => person.isAdmin).map((person) => person.fullName)
 assert(matchStaff(staff, "Durani").length === 1, "Durani");
 assert(matchStaff(staff, "samoon")[0]?.id === "STF-11", "Samoon login");
 assert(matchStaff(staff, "Ahmadi")[0]?.id === "STF-06", "Ahmadi login");
-assert(await verifyPassword("durani", await getPasswordHash("STF-02")), "starting password is the last name");
-assert(await verifyPassword("ahmadi", await getPasswordHash("STF-06")), "Ahmadi password");
-assert(!(await verifyPassword("samoon", await getPasswordHash("STF-06"))), "Ahmadi is not Samoon");
+assert(!(await verifyPassword("durani", await getPasswordHash("STF-02"))), "last name is no longer the password");
+assert(!(await verifyPassword("samoon", await getPasswordHash("STF-11"))), "Samoon password was replaced");
+assert(!(await verifyPassword("ahmadi", await getPasswordHash("STF-06"))), "Ahmadi password was replaced");
+assert((await getPasswordHash("STF-02")).startsWith("scrypt$"), "password is hashed");
 await setPassword("STF-02", "x");
 assert(await verifyPassword("x", await getPasswordHash("STF-02")), "one character password");
 await setPassword("STF-02", "a b  ");
@@ -60,6 +62,32 @@ await replaceStaffWeek("STF-02", "2026-11-21", [
 const days = await plansBetween("2026-11-21", "2026-11-26");
 const row = days.find((day) => day.staffId === "STF-02" && day.day === "2026-11-21");
 assert(row?.projects.length === 2, "multi-project day");
+await replaceStaffWeek("STF-02", "2026-11-21", [
+  {
+    day: "2026-11-22",
+    province: "Ghazni",
+    location: "Ghazni city",
+    activity: "site_visit",
+    note: "Keep this day",
+    projectIds: ["REV2-EWSSO"],
+  },
+]);
+await replaceStaffWeek("STF-02", "2026-11-21", [
+  {
+    day: "2026-11-21",
+    province: "Paktika",
+    location: "Yousuf Khail",
+    activity: "monitoring",
+    note: "Updated Saturday only",
+    projectIds: ["JICA-ALCC"],
+  },
+]);
+const afterDay = await plansBetween("2026-11-21", "2026-11-26");
+const saturday = afterDay.find((day) => day.staffId === "STF-02" && day.day === "2026-11-21");
+const sunday = afterDay.find((day) => day.staffId === "STF-02" && day.day === "2026-11-22");
+assert(saturday?.note === "Updated Saturday only" && saturday.projects.length === 1, "one day saved");
+assert(sunday?.note === "Keep this day", "other day kept");
+assert((await getStaff("STF-02"))!.sessionVersion >= 3, "password change ends other sessions");
 const alcc = days.filter((day) => day.projects.some((project) => project.id === "JICA-ALCC")).length;
 assert(alcc >= 1, "dashboard count");
 
@@ -80,6 +108,29 @@ const updates = await listFieldUpdates();
 const alccUpdates = updates["JICA-ALCC"] ?? [];
 assert(alccUpdates.some((update) => update.kind === "plan" && update.place.includes("Yousuf Khail")), "map plan update");
 assert(alccUpdates.some((update) => update.kind === "mission"), "map mission update");
+
+await saveBtor(
+  {
+    missionId: "MIS-2026-1008",
+    partnerName: "UNRT meeting Logar",
+    staffText: "Dad Mohammad Samoon – Livelihood Field Officer",
+    datesText: "8 Oct 2026",
+    locationText: "Pul-e-Alam, Logar Province",
+    objectives: "Represent UNDP at the Logar UNRT meeting.",
+    activities: "Presented UNDP activities.",
+    findings: "The Deputy Governor chaired the meeting.",
+    challenges: "Reduced funding.",
+    recommendations: "Follow up with UNAMA.",
+    stakeholders: "Deputy Governor of Logar; UNAMA",
+    pictures: "Cameras were not encouraged.",
+  },
+  "STF-11",
+);
+const report = await getBtor("MIS-2026-1008");
+assert(report?.findings.includes("Deputy Governor"), "btor saved");
+assert((await getMission("MIS-2026-1008"))?.btorDone === true, "btor marks the mission done");
+const file = await btorDocx(report!);
+assert(file.subarray(0, 2).toString() === "PK", "word file");
 
 console.log("verify ok", { staff: staff.length, projects: projects.length, missions: missions.length, workplans: workplans.length });
 }

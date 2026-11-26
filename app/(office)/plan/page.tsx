@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { fieldClass } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { saveWeek } from "@/lib/actions";
+import { saveDay } from "@/lib/actions";
 import { getCurrentUser } from "@/lib/auth";
 import { connection } from "next/server";
 import { addDays, canEditWeek, formatDayShort, formatWeekRange, kabulToday, weekDates, weekStartFor } from "@/lib/dates";
 import { ACTIVITIES, PROVINCES, activityLabel } from "@/lib/labels";
+import { byLastName } from "@/lib/names";
 import { getWorkDays, listProjects, listStaff, plansBetween } from "@/lib/queries";
 import { one } from "@/lib/utils";
 
@@ -40,10 +41,10 @@ async function PlanForm({
   const today = kabulToday(new Date());
   const weekStart = weekStartFor(one(params.week) || today, workDays);
   const dates = weekDates(weekStart, workDays);
-  const staff = await listStaff();
+  const staff = byLastName(await listStaff());
   const viewed = staff.find((person) => person.id === one(params.staff)) ?? user;
   const own = viewed.id === user.id;
-  const editable = own && canEditWeek(dates, today, user.isAdmin);
+  const canFile = (own || user.isAdmin) && canEditWeek(dates, today, user.isAdmin);
   const [projects, plans] = await Promise.all([
     listProjects(),
     plansBetween(dates[0] ?? weekStart, dates[dates.length - 1] ?? weekStart),
@@ -59,10 +60,10 @@ async function PlanForm({
       }
     }
   }
+  const staffQuery = own ? "" : `&staff=${viewed.id}`;
 
   return (
-    <form action={saveWeek} className="space-y-4">
-      <input type="hidden" name="weekStart" value={weekStart} />
+    <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-navy">{own ? "My week" : viewed.fullName}</h1>
@@ -70,41 +71,65 @@ async function PlanForm({
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline" size="sm">
-            <Link href={`/plan?week=${addDays(weekStart, -7)}${own ? "" : `&staff=${viewed.id}`}`}>Previous</Link>
+            <Link href={`/plan?week=${addDays(weekStart, -7)}${staffQuery}`}>Previous</Link>
           </Button>
           <Button asChild variant="outline" size="sm">
             <Link href={`/plan${own ? "" : `?staff=${viewed.id}`}`}>This week</Link>
           </Button>
           <Button asChild variant="outline" size="sm">
-            <Link href={`/plan?week=${addDays(weekStart, 7)}${own ? "" : `&staff=${viewed.id}`}`}>Next</Link>
+            <Link href={`/plan?week=${addDays(weekStart, 7)}${staffQuery}`}>Next</Link>
           </Button>
         </div>
       </div>
+      {user.isAdmin ? (
+        <form method="get" action="/plan" className="flex flex-wrap items-end gap-2">
+          <input type="hidden" name="week" value={weekStart} />
+          <label className="text-sm">
+            <span className="mb-1 block font-medium">Filing for</span>
+            <select className={fieldClass} name="staff" defaultValue={viewed.id} aria-label="Staff member">
+              {staff.filter((person) => person.active || person.id === viewed.id).map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.fullName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button type="submit" variant="outline">
+            Open
+          </Button>
+        </form>
+      ) : null}
       <Banner notice={one(params.notice)} error={one(params.error)} />
       <p className="text-sm leading-6 text-muted-foreground">
-        Tick every project you will work on that day. A day can have more than one. District, activity, and note are optional.
+        Tick every project for that day, then save the day. A dropped connection keeps the other days.
       </p>
-      {!own ? (
+      {!own && canFile ? (
+        <p className="rounded-md bg-slate-100 px-3 py-2 text-sm">You are filing {viewed.fullName}&apos;s week.</p>
+      ) : null}
+      {!own && !canFile ? (
         <p className="rounded-md bg-slate-100 px-3 py-2 text-sm">You are reading {viewed.fullName}&apos;s week.</p>
       ) : null}
-      {!editable && own ? (
+      {!canFile && own ? (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-950">
           This week is closed. The current week and later weeks can still be edited.
         </p>
       ) : null}
-      <fieldset disabled={!editable} className="space-y-3">
-        {dates.map((day) => {
-          const entry = byDay.get(day);
-          const selected = new Set(entry?.projects.map((project) => project.id) ?? []);
-          const summary = [
-            selected.size ? `${selected.size} project${selected.size === 1 ? "" : "s"}` : "No projects",
-            entry?.activity ? activityLabel(entry.activity) : "",
-            entry?.province ?? "",
-          ]
-            .filter(Boolean)
-            .join(" · ");
-          return (
-            <Card key={day} className="overflow-hidden">
+      {dates.map((day) => {
+        const entry = byDay.get(day);
+        const selected = new Set(entry?.projects.map((project) => project.id) ?? []);
+        const summary = [
+          selected.size ? `${selected.size} project${selected.size === 1 ? "" : "s"}` : "No projects",
+          entry?.activity ? activityLabel(entry.activity) : "",
+          entry?.province ?? "",
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        return (
+          <form key={day} action={saveDay}>
+            <input type="hidden" name="weekStart" value={weekStart} />
+            <input type="hidden" name="staffId" value={viewed.id} />
+            <input type="hidden" name="day" value={day} />
+            <Card className="overflow-hidden">
               <details open={day === today || selected.size > 0 || Boolean(entry?.note)}>
                 <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3">
                   <span>
@@ -112,14 +137,14 @@ async function PlanForm({
                     {day === today ? <span className="ml-2 text-xs font-medium text-primary">Today</span> : null}
                     <span className="mt-0.5 block text-xs text-muted-foreground">{summary}</span>
                   </span>
-                  <span className="text-xs text-muted-foreground">Edit</span>
+                  <span className="text-xs text-muted-foreground">{canFile ? "Edit" : "Closed"}</span>
                 </summary>
-                <div className="space-y-4 border-t border-border px-4 py-4">
+                <fieldset disabled={!canFile} className="space-y-4 border-t border-border px-4 py-4">
                   <ProjectChecks projects={picker} selected={selected} valueFor={(project) => `${day}|${project.id}`} />
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="text-sm">
                       <span className="mb-1 block font-medium">Activity</span>
-                      <select className={fieldClass} name={`activity_${day}`} defaultValue={entry?.activity ?? ""}>
+                      <select className={fieldClass} name="activity" defaultValue={entry?.activity ?? ""}>
                         <option value="">Not set</option>
                         {ACTIVITIES.map((activity) => (
                           <option key={activity.id} value={activity.id}>
@@ -130,7 +155,7 @@ async function PlanForm({
                     </label>
                     <label className="text-sm">
                       <span className="mb-1 block font-medium">Province</span>
-                      <select className={fieldClass} name={`province_${day}`} defaultValue={entry?.province ?? ""}>
+                      <select className={fieldClass} name="province" defaultValue={entry?.province ?? ""}>
                         <option value="">Not set</option>
                         {PROVINCES.map((province) => (
                           <option key={province}>{province}</option>
@@ -139,32 +164,24 @@ async function PlanForm({
                     </label>
                     <label className="text-sm sm:col-span-2">
                       <span className="mb-1 block font-medium">District / location</span>
-                      <input
-                        className={fieldClass}
-                        name={`location_${day}`}
-                        defaultValue={entry?.location ?? ""}
-                        maxLength={200}
-                        placeholder="e.g. Yousuf Khail"
-                      />
+                      <input className={fieldClass} name="location" defaultValue={entry?.location ?? ""} maxLength={200} placeholder="e.g. Yousuf Khail" />
                     </label>
                     <label className="text-sm sm:col-span-2">
                       <span className="mb-1 block font-medium">Note</span>
-                      <Textarea name={`note_${day}`} defaultValue={entry?.note ?? ""} maxLength={1000} />
+                      <Textarea name="note" defaultValue={entry?.note ?? ""} maxLength={1000} />
                     </label>
                   </div>
-                </div>
+                  {canFile ? (
+                    <Button type="submit" size="lg" className="w-full sm:w-auto">
+                      Save {formatDayShort(day)}
+                    </Button>
+                  ) : null}
+                </fieldset>
               </details>
             </Card>
-          );
-        })}
-      </fieldset>
-      {editable ? (
-        <div className="sticky bottom-0 -mx-4 border-t border-border bg-white/95 px-4 py-3">
-          <Button type="submit" size="lg" className="w-full sm:w-auto">
-            Save week
-          </Button>
-        </div>
-      ) : null}
-    </form>
+          </form>
+        );
+      })}
+    </div>
   );
 }

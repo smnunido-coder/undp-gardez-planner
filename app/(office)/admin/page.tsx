@@ -92,7 +92,7 @@ async function Admin({
                 type="text"
                 autoComplete="off"
                 spellCheck={false}
-                placeholder={editingStaff ? "Leave blank to keep the current password" : "Leave blank to start with the last name"}
+                placeholder={editingStaff ? "Leave blank to keep the current password" : "Type any password"}
               />
             </label>
             <label className="flex items-center gap-2 text-sm">

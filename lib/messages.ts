@@ -1,5 +1,7 @@
 export const NOTICES: Record<string, string> = {
   plan: "Week saved. The dashboard now shows this plan to the whole office.",
+  day: "Day saved. The dashboard now shows it to the whole office.",
+  btor: "Back to office report saved.",
   week: "Work week saved. New plans use these days.",
   staff: "Staff list saved.",
   password: "Password saved.",
@@ -19,6 +21,8 @@ export const ERRORS: Record<string, string> = {
   mission: "Add a title, dates, a status, and a short purpose.",
   empty: "Type your last name.",
   password: "That password does not match.",
+  "password-needed": "Type a password for this person. Any text is fine.",
+  btor: "Add the partner, staff, dates, location, and purpose before saving the report.",
   none: "No one on the staff list has that last name.",
   inactive: "That name is inactive. Ask Samoon to turn it back on.",
   database: "The site cannot reach the database yet. The Turso address and token need to be saved, then the site deployed again.",

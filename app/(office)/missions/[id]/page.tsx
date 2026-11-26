@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { Banner } from "@/components/banner";
@@ -35,7 +36,12 @@ async function Editor({
   if (!mission) notFound();
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <h1 className="text-2xl font-semibold text-navy">Edit mission</h1>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h1 className="text-2xl font-semibold text-navy">Edit mission</h1>
+        <Link href={`/missions/${mission.id}/btor`} className="text-sm font-medium text-primary">
+          {mission.btorDone ? "Open the back to office report" : "Write the back to office report"}
+        </Link>
+      </div>
       <Banner notice={one(query.notice)} error={one(query.error)} />
       <MissionForm mission={mission} staff={byLastName(staff)} projects={projects} />
     </div>

@@ -4,6 +4,22 @@ export type Staff = {
   role: string;
   isAdmin: boolean;
   active: boolean;
+  sessionVersion: number;
+};
+
+export type BtorReport = {
+  missionId: string;
+  partnerName: string;
+  staffText: string;
+  datesText: string;
+  locationText: string;
+  objectives: string;
+  activities: string;
+  findings: string;
+  challenges: string;
+  recommendations: string;
+  stakeholders: string;
+  pictures: string;
 };
 
 export type Project = {

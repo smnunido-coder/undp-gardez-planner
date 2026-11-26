@@ -123,7 +123,7 @@ async function LoginForm({
         )}
       </Card>
       <p className="mt-4 text-xs leading-5 text-muted-foreground">
-        The starting password is the last name in lowercase, such as samoon or ahmadi. Samoon can change any of them. The phone remembers you for 60 days.
+        Samoon sets each password and can change it. Changing a password signs that person out of other phones. This phone remembers you for 60 days.
       </p>
     </main>
   );

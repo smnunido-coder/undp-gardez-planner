@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sessionCookie } from "@/lib/auth";
+import { getStaff } from "@/lib/queries";
 import { checkSignIn } from "@/lib/sign-in";
 
 export async function POST(request: Request) {
@@ -12,7 +13,11 @@ export async function POST(request: Request) {
   if (!result.ok) {
     return NextResponse.redirect(new URL(`/login?${result.query}`, request.url), 303);
   }
-  const cookie = sessionCookie(result.staffId);
+  const staff = await getStaff(result.staffId);
+  if (!staff) {
+    return NextResponse.redirect(new URL("/login?error=database", request.url), 303);
+  }
+  const cookie = sessionCookie(staff.id, staff.sessionVersion);
   const response = NextResponse.redirect(new URL("/", request.url), 303);
   response.cookies.set(cookie.name, cookie.value, cookie.options);
   return response;

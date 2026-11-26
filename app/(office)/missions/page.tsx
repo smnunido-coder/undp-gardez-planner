@@ -72,7 +72,13 @@ async function Missions({
               <p className="mt-1 text-sm text-muted-foreground">
                 {mission.projectIds.map((id) => projectById.get(id) ?? id).join(", ")}
               </p>
-              <p className="mt-2 text-xs font-medium">{mission.btorDone ? "BTOR done" : "BTOR not done"}</p>
+              <p className="mt-2 text-xs font-medium">
+                {mission.btorDone ? "BTOR done" : "BTOR not done"}
+                {" · "}
+                <Link href={`/missions/${mission.id}/btor`} className="text-primary">
+                  {mission.btorDone ? "Open the report" : "Write the report"}
+                </Link>
+              </p>
             </Card>
           ))}
         </div>

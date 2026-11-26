@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { fieldClass } from "@/components/ui/input";
 import { formatDate } from "@/lib/dates";
 import { progressPercent, statusClass } from "@/lib/labels";
-import { listProjects } from "@/lib/queries";
+import { latestBtorsByProject, listProjects } from "@/lib/queries";
 import { one } from "@/lib/utils";
 
 export const metadata = { title: "Projects" };
@@ -33,7 +33,7 @@ async function Projects({
   const programme = one(params.programme);
   const status = one(params.status);
   const province = one(params.province);
-  const projects = await listProjects();
+  const [projects, latest] = await Promise.all([listProjects(), latestBtorsByProject()]);
   const filtered = projects.filter((project) => {
     if (programme && project.programme !== programme) return false;
     if (status && project.status !== status) return false;
@@ -106,6 +106,15 @@ async function Projects({
                   {project.budget ? ` · ${project.budget}` : ""}
                   {project.ref ? ` · ${project.ref}` : ""}
                 </p>
+                {latest[project.id] ? (
+                  <p className="mt-2 text-sm">
+                    <Link href={`/missions/${latest[project.id]!.missionId}/btor`} className="font-medium text-primary">
+                      Latest BTOR · {formatDate(latest[project.id]!.date)}
+                    </Link>
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-muted-foreground">No BTOR yet</p>
+                )}
                 {percent != null ? (
                   <div className="mt-3">
                     <div className="h-2 rounded-full bg-slate-100">

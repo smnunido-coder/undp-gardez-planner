@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatDate } from "@/lib/dates";
 import { statusClass } from "@/lib/labels";
-import { listMissions, listProjects, listStaff } from "@/lib/queries";
+import { latestBtorsByProject, listMissions, listProjects, listStaff } from "@/lib/queries";
 import { one } from "@/lib/utils";
 
 export const metadata = { title: "Missions" };
@@ -29,7 +29,12 @@ async function Missions({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const [missions, staff, projects] = await Promise.all([listMissions(), listStaff(), listProjects()]);
+  const [missions, staff, projects, latest] = await Promise.all([
+    listMissions(),
+    listStaff(),
+    listProjects(),
+    latestBtorsByProject(),
+  ]);
   const staffById = new Map(staff.map((person) => [person.id, person.fullName]));
   const projectById = new Map(projects.map((project) => [project.id, project.shortName]));
 
@@ -69,9 +74,25 @@ async function Missions({
               <p className="mt-1 text-sm">
                 {mission.staffIds.map((id) => staffById.get(id) ?? id).join(", ") || "No travellers listed"}
               </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {mission.projectIds.map((id) => projectById.get(id) ?? id).join(", ")}
-              </p>
+              {mission.projectIds.length > 0 ? (
+                <ul className="mt-2 space-y-1">
+                  {mission.projectIds.map((id) => {
+                    const report = latest[id];
+                    return (
+                      <li key={id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                        <span className="text-muted-foreground">{projectById.get(id) ?? id}</span>
+                        {report ? (
+                          <Link href={`/missions/${report.missionId}/btor`} className="font-medium text-primary">
+                            Latest BTOR · {formatDate(report.date)}
+                          </Link>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">No BTOR yet</span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
               <p className="mt-2 text-xs font-medium">
                 {mission.btorDone ? "BTOR done" : "BTOR not done"}
                 {" · "}

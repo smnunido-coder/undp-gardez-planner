@@ -364,6 +364,27 @@ export async function listWeekStarts(): Promise<string[]> {
   return rows.map((row) => text(row.week_start));
 }
 
+export async function latestBtorsByProject(): Promise<Record<string, { missionId: string; title: string; date: string }>> {
+  const rows = await all<SqlRow>(
+    `SELECT mp.project_id, m.id AS mission_id, m.title, m.end_date, m.start_date
+     FROM mission_projects mp
+     JOIN missions m ON m.id = mp.mission_id
+     JOIN mission_reports r ON r.mission_id = m.id
+     ORDER BY m.end_date DESC, m.start_date DESC, m.id DESC`,
+  );
+  const latest: Record<string, { missionId: string; title: string; date: string }> = {};
+  for (const row of rows) {
+    const projectId = text(row.project_id);
+    if (latest[projectId]) continue;
+    latest[projectId] = {
+      missionId: text(row.mission_id),
+      title: text(row.title),
+      date: text(row.end_date) || text(row.start_date),
+    };
+  }
+  return latest;
+}
+
 export async function listMissions(): Promise<Mission[]> {
   const rows = await all<SqlRow>(`${MISSION_SELECT} ORDER BY m.start_date DESC, m.title`);
   return rows.map(mapMission);

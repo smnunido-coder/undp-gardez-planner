@@ -369,7 +369,8 @@ export async function latestBtorsByProject(): Promise<Record<string, { missionId
     `SELECT mp.project_id, m.id AS mission_id, m.title, m.end_date, m.start_date
      FROM mission_projects mp
      JOIN missions m ON m.id = mp.mission_id
-     JOIN mission_reports r ON r.mission_id = m.id
+     WHERE m.btor_done = 1
+        OR EXISTS (SELECT 1 FROM mission_reports r WHERE r.mission_id = m.id)
      ORDER BY m.end_date DESC, m.start_date DESC, m.id DESC`,
   );
   const latest: Record<string, { missionId: string; title: string; date: string }> = {};

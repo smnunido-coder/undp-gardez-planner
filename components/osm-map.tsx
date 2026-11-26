@@ -9,9 +9,17 @@ export type MapPin = {
   lng: number;
   title: string;
   detail: string;
+  lines: string[];
   color: string;
   kind: "project" | "tag";
 };
+
+function popupHtml(pin: MapPin): string {
+  const escape = (value: string) =>
+    value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character] ?? character);
+  const body = pin.lines.map((line) => `<p style="margin:4px 0">${escape(line)}</p>`).join("");
+  return `<div style="font:14px/1.4 sans-serif;color:#1c2834"><strong>${escape(pin.title)}</strong>${pin.detail ? `<div style="color:#5c6b7a">${escape(pin.detail)}</div>` : ""}${body}</div>`;
+}
 
 export function OsmMap({
   pins,
@@ -81,9 +89,10 @@ export function OsmMap({
           iconSize: [36, 36],
           iconAnchor: [18, 18],
         });
-        const marker = leaflet.marker([pin.lat, pin.lng], { icon, title: pin.title }).addTo(map);
-        marker.bindTooltip(`${pin.title}${pin.detail ? ` · ${pin.detail}` : ""}`, { direction: "top", offset: [0, -8] });
+        const marker = leaflet.marker([pin.lat, pin.lng], { icon, title: pin.title, riseOnHover: true }).addTo(map);
+        marker.bindPopup(popupHtml(pin), { maxWidth: 280, autoPan: true });
         marker.on("click", () => {
+          marker.openPopup();
           if (pin.kind === "project") handlers.current.onProject(pin.id);
           else handlers.current.onTag(pin.id);
         });

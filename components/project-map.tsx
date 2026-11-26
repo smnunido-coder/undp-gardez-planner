@@ -89,12 +89,19 @@ export function ProjectMap({
       items.forEach((project, index) => {
         const radius = items.length === 1 ? 0 : 0.06;
         const angle = (index / items.length) * Math.PI * 2;
+        const latest = project.updates[0];
         placed.push({
           id: project.id,
           lat: center[1] + Math.sin(angle) * radius,
           lng: center[0] + Math.cos(angle) * radius,
           title: project.shortName,
           detail: name,
+          lines: [
+            project.name,
+            `${project.programme} · ${project.partner}`,
+            project.status,
+            latest ? `Latest: ${formatDate(latest.date)} · ${latest.title}` : "No field update yet",
+          ],
           color: statusColor(project.status),
           kind: "project",
         });
@@ -110,6 +117,7 @@ export function ProjectMap({
         lng: tag.lng,
         title: tag.name,
         detail: linked?.shortName ?? "Tagged place",
+        lines: [tag.note, tag.createdByName ? `Tagged by ${tag.createdByName}` : ""].filter(Boolean),
         color: "#b45309",
         kind: "tag",
       });
@@ -118,11 +126,10 @@ export function ProjectMap({
   }, [visible, tags, projects, programme, province]);
 
   const focus = useMemo(() => {
-    const name = province || selected?.provinces.find((item) => CENTROIDS.has(item));
-    const center = name ? CENTROIDS.get(name) : undefined;
+    const center = province ? CENTROIDS.get(province) : undefined;
     if (!center) return null;
-    return { lng: center[0], lat: center[1], zoom: province ? 9 : 8 };
-  }, [province, selected]);
+    return { lng: center[0], lat: center[1], zoom: 9 };
+  }, [province]);
 
   return (
     <div className="space-y-3">
@@ -197,7 +204,11 @@ export function ProjectMap({
             <Legend color="#8aa0b3" label="Procurement" />
             <Legend color="#b45309" label="Tagged place" />
           </div>
-          {selected ? <ProjectOverlay project={selected} onClose={() => setSelectedId("")} /> : null}
+          {selected ? (
+            <div className="border-t border-border bg-white p-3">
+              <ProjectOverlay project={selected} onClose={() => setSelectedId("")} />
+            </div>
+          ) : null}
           {selectedTag ? (
             <TagOverlay
               tag={selectedTag}
@@ -308,7 +319,7 @@ function ProjectOverlay({ project, onClose }: { project: MapProject; onClose: ()
   const percent = progressPercent(project.progress);
   const dates = project.windowText || [project.startDate, project.endDate].filter(Boolean).map((date) => formatDate(date!)).join(" – ");
   return (
-    <aside className="absolute inset-x-2 bottom-12 z-[800] flex h-[68%] flex-col overflow-hidden rounded-lg border border-border bg-white shadow-lg sm:inset-x-auto sm:right-3 sm:top-3 sm:bottom-14 sm:h-auto sm:w-80">
+    <aside className="max-h-80 overflow-y-auto">
       <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
         <h2 className="font-semibold text-navy">{project.shortName}</h2>
         <button type="button" onClick={onClose} className="shrink-0 text-sm font-medium text-primary">
